@@ -64,7 +64,6 @@ getactions <- function(DAG, actions) {
 # Internal function for simulation data from any DAG
 # If prev.data is not NULL all the nodes in DAG will be evaluated in the environment of prev.data alone
 simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, prev.data = NULL) {
-# simFromDAG <- function(DAG, Nsamp, data_fmt = "wide", LTCF = NULL, rndseed = NULL, prev.data = NULL) {
 	if (!is.null(rndseed)) {
 		set.seed(rndseed)
 	}
@@ -388,36 +387,36 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
 	return(obs.df)
 }
 
-
 #' Simulate Observed Data
 #'
-#' This function simulates observed data from a DAG object
+#' This function simulates observed data from a DAG object.
 #' @param DAG A DAG objects that has been locked with set.DAG(DAG). Observed data from this DAG will be simulated.
 #' @param n Number of observations to sample.
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
-#' @param LTCF The name of the right-censoring / failure event indicator variable for the Last Time-point Carried Forward imputation. By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA). The end of follow-up event occurs when a binary node declared with EFU=TRUE is observed to be equal to 1, indicating a failing or right-censoring event. To forward impute the values of the time-varying nodes after the occurrence of the EFU event, set the LTCF argument to a name of the EFU node representing this event. This implies that for each observation, missing value of a time-varying variable (that is node declared with t argument) will be replaced by the last observed value of that variable, if the missingness is a result of the EFU event of the node LTCF.
+#' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. See the vignette, \code{\link{sim}} and \code{\link{doLTCF}} for additional details.
 #' @param rndseed Seed for the random number generator.
 #' @return A data.frame where each column is sampled from the conditional distribution specified by the corresponding \code{DAG} object node.
+#' @family simulation functions
+#' @seealso \code{\link{simfull}} - a wrapper function for simulating full data only; \code{\link{sim}} - a wrapper function for simulating both types of data; \code{\link{doLTCF}} for forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
 #' @export
-# simObsData <- function(DAG, n, wide = TRUE, LTCF = NULL, rndseed = NULL) {
 simobs <- function(DAG, n, wide = TRUE, LTCF = NULL, rndseed = NULL) {
 	if (!is.DAG(DAG)) stop("DAG argument must be an object of class DAG")
-
 	simFromDAG(DAG=DAG, Nsamp=n, wide=wide, LTCF=LTCF, rndseed=rndseed)
 }
 
-#' Simulate Full Data (From Action/Intervention DAG(s))
+#' Simulate Full Data (From Action DAG(s))
 #'
-#' This function simulates full data based on a list of intervention DAGs, returning a list of \code{data.frames}
+#' This function simulates full data based on a list of intervention DAGs, returning a list of \code{data.frame}s.
 #' @param actions Actions specifying the counterfactual DAG. This argument must be either an object of class DAG.action or a list of DAG.action objects.
 #' @param n Number of observations to sample.
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
-#' @param LTCF The name of the right-censoring / failure event indicator variable for the Last Time-point Carried Forward imputation. By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA). The end of follow-up event occurs when a binary node declared with EFU=TRUE is observed to be equal to 1, indicating a failing or right-censoring event. To forward impute the values of the time-varying nodes after the occurrence of the EFU event, set the LTCF argument to a name of the EFU node representing this event. This implies that for each observation, missing value of a time-varying variable (that is node declared with t argument) will be replaced by the last observed value of that variable, if the missingness is a result of the EFU event of the node LTCF.
+#' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. See the vignette, \code{\link{sim}} and \code{\link{doLTCF}} for additional details.
 #' @param rndseed Seed for the random number generator.
 #' @return A named list, each item is a \code{data.frame} corresponding to an action specified by the actions argument, action names are used for naming these list items.
+#' @family simulation functions
+#' @seealso \code{\link{simobs}} - a wrapper function for simulating observed data only; \code{\link{sim}} - a wrapper function for simulating both types of data; \code{\link{doLTCF}} for forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
 #' @export
 simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed=NULL) {
-# simfullData <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed=NULL) {
 	if (!is.null(rndseed)) {
 		set.seed(rndseed)
 	}
@@ -455,28 +454,34 @@ simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed=NULL) {
 	return(fulldf.list)
 }
 
-#' Simulate from DAG or list of DAGs (Either Action or Observed DAG(s))
+#' Simulate Observed or Full Data from \code{DAG} Object
 #'
-#' This function simulates full data based on a list of intervention DAGs, returning a list of \code{data.frames}
+#' This function simulates full data based on a list of intervention DAGs, returning a list of \code{data.frame}s. See the vignette for examples and detailed description.
+#' @section Forward Imputation:
+#' By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA). 
+#' The end of follow-up event occurs when a binary node of type \code{EFU=TRUE} is equal to 1, indicating a failing or right-censoring event. 
+#' To forward impute the values of the time-varying nodes after the occurrence of the \code{EFU} event, set the LTCF argument to a name of the EFU node representing this event. 
+#' For additional details and examples see the vignette and \code{\link{doLTCF}} function.
 #' @param DAG A DAG objects that has been locked with set.DAG(DAG). Observed data from this DAG will be simulated if actions argument is omitted.
 #' @param actions Character vector of action names which will be extracted from the DAG object. Alternatively, this can be a list of action DAGs selected with \code{A(DAG)} function, in which case the argument \code{DAG} is unused. When this argument is missing, the default is to samlpe observed data from the \code{DAG} object.
 #' @param n Number of observations to sample.
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
-#' @param LTCF The name of the right-censoring / failure event indicator variable for the Last Time-point Carried Forward imputation. By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA). The end of follow-up event occurs when a binary node declared with EFU=TRUE is observed to be equal to 1, indicating a failing or right-censoring event. To forward impute the values of the time-varying nodes after the occurrence of the EFU event, set the LTCF argument to a name of the EFU node representing this event. This implies that for each observation, missing value of a time-varying variable (that is node declared with t argument) will be replaced by the last observed value of that variable, if the missingness is a result of the EFU event of the node LTCF.
+#' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. 
 #' @param rndseed Seed for the random number generator.
 #' @return If actions argument is missing a simulated data.frame is returned, otherwise the function returns a named list of action-specific simulated data.frames with action names giving names to corresponding list items.
+#' @family simulation functions
+#' @seealso \code{\link{simobs}} - a wrapper function for simulating observed data only; \code{\link{simfull}} - a wrapper function for simulating full data only; \code{\link{doLTCF}} - forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
+#' @example tests/RUnit/sim.impute.examples12.R
 #' @export
 sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed=NULL) {
 	# *) check if actions argument is missing -> simulate observed data from the DAG
 	# *) if actions consist of characters, try to extract those actions from the DAG and simulate full data
-
 	# SIMULATE OBSERVED DATA FROM DAG (if no actions)
 	if (missing(actions)) {	
 		if (!is.DAG(DAG)) stop("DAG argument must be an object of class DAG")
 		if (!is.DAGlocked(DAG)) stop("call set.DAG() before attempting to simulate data from DAG")
-		message(cat("simulating observed dataset from the DAG object"))
+		message("simulating observed dataset from the DAG object")
 		return(simobs(DAG=DAG, n=n, wide = wide, LTCF = LTCF, rndseed = rndseed))
-
 	# SIMULATE FULL DATA FROM ACTION DAGs (when actions are present)
 	} else {
 		if (is.character(actions)) { # grab appropriate actions from the DAG by name
@@ -488,20 +493,31 @@ sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed=NULL) {
 		} else {
 			stop("argument actions must be a character vector of action names or a list of action DAGs")
 		}
-		message(cat("simulating action-specific datasets for action(s): ", names(actions)))
+		message("simulating action-specific datasets for action(s): "%+%paste(names(actions), collapse = " "))
 		return(simfull(actions=actions, n=n, wide = wide, LTCF = LTCF, rndseed=rndseed))
 	}
 }
 
-#' Last Timepoint Carried Forward (LTCF)
+#' Missing Variable Imputation with Last Time Point Value Carried Forward (LTCF)
 #'
-#' Carry forward (forward impute) all missing variable values for simulated observations that have reached the end of their follow-up, as defined by the node of type (EOF=TRUE).
+#' Forward imputation for missing variable values in simulated data after a particular end of the follow-up event. The end of follow-up event is defined by the node of type \code{EOF=TRUE} being equal to 1.
+#' @section Details:
+#' The default behavior of the \code{sim} function consists in setting all nodes that temporally follow an \code{EFU} node whose simulated value is 1 to missing (i.e., \code{NA}). 
+#' The argument \code{LTCF} of the \code{sim} function can however be used to change this default behavior and impute some of these missing values with \emph{last time point value carried forward} (LTCF).
+#' More specifically, only the missing values of time-varying nodes (i.e., those with non-missing \code{t} argument) that follow the end of follow-up event encoded by the \code{EFU} node specified by the \code{LTCF} argument will be imputed. 
+#' One can use the function \code{doLTCF} to apply the \emph{last time point value carried forward} (LTCF) imputation to an existing simulated dataset obtained from the function \code{sim} that was called with its default imputation setting (i.e., with no \code{LTCF} argument). 
+#' Illustration of the use of the LTCF imputation functionality are provided in the package vignette. 
+#'
+#' The first example below shows the default data format of the \code{sim} function after an end of the follow-up event and how this behavior can be modified to generate data with LTCF imputation by either using the \code{LTCF} argument of the
+#' \code{sim} function or by calling the \code{doLTCF} function. The second example demonstrates how to use the \code{doLTCF} function to perform LTCF imputation on already existing data simulated with the \code{sim} function based on its default non-imputation behavior.
 #' @param data Simulated \code{data.frame} in wide format
-#' @param outcome Character string specifying the outcome node that is the indicator of the end of follow-up (observations with value of the outcome variable being 1 indicate that the end of follow-up has been reached). The outcome variable must be a binary node that was declared with \code{EFU=TRUE}.
-#' @return Modified simulated \code{data.frame}, forward imputed all variables after outcome switched to 1.
+#' @param LTCF Character string specifying the outcome node that is the indicator of the end of follow-up (observations with value of the outcome variable being 1 indicate that the end of follow-up has been reached). The outcome variable must be a binary node that was declared with \code{EFU=TRUE}.
+#' @return Modified \code{data.frame}, all time-varying missing variables after the \code{EFU} outcome specified in \code{LTCF} are forward imputed with their last available non-missing value.
+#' @family data manipulation functions
+#' @seealso \code{\link{sim}}, \code{\link{simobs}} and \code{\link{simfull}} for simulating data with and without carry forward imputation.
+#' @example tests/RUnit/sim.impute.examples12.R
 #' @export
-doLTCF <- function(data, outcome) {
-	# attrslist=attributes(data)
+doLTCF <- function(data, LTCF) {
 	DAG <- attr(data, "DAG")
 	Nsamp <- nrow(data)
 	LTCF.prev <- rep(FALSE,Nsamp)
@@ -516,7 +532,7 @@ doLTCF <- function(data, outcome) {
 		t_new <- !(t%in%t_pts) # set to TRUE when switch to new time point t occurs otherwise FALSE
 		t_pts <- c(t_pts,t); t_pts <- as.integer(unique(t_pts)) # vector that keeps track of unique timepoints t
 		gnodename <- as.character(unlist(strsplit(cur.node$name, "_"))[1])
-		if (gnodename%in%outcome) { # if this generic node name is the outcome we need to carry forward this observation when it evaluates to 1
+		if (gnodename%in%LTCF) { # if this generic node name is the outcome we need to carry forward this observation when it evaluates to 1
 			cur.outcome <- TRUE
 		} else {
 			cur.outcome <- FALSE
@@ -533,7 +549,7 @@ doLTCF <- function(data, outcome) {
 	}
 
 	if (sum(LTCF.prev)>0) {	# only change the LTCF attribute if outcome carry forward imputation was carried out for at least one obs
-		LTCF_flag <- outcome
+		LTCF_flag <- LTCF
 	} else {
 		LTCF_flag <- NULL
 	}
@@ -543,9 +559,9 @@ doLTCF <- function(data, outcome) {
 	return(data)
 }
 
-#' Convert data from wide format into long format using \code{reshape} base function
+#' Convert Data from Wide to Long Format Using \code{reshape}
 #'
-#' This utility function takes a simulated data.frame in wide format as an input and converts it into a long format (slower compared to \code{\link{DF.to.longDT}})
+#' This utility function takes a simulated data.frame in wide format as an input and converts it into a long format (slower compared to \code{\link{DF.to.longDT}}).
 #'
 #' Keeps all covariates that appear only once and at the first time-point constant (carry-forward).
 #'
@@ -557,6 +573,8 @@ doLTCF <- function(data, outcome) {
 #'
 #' @param df_wide A \code{data.frame} in wide format
 #' @return A \code{data.frame} object in long format
+#' @seealso \code{\link{DF.to.longDT}} - a faster version of \code{DF.to.long} that produces a \code{data.table} object as an output.
+#' @family data manipulation functions
 #' @export
 DF.to.long <- function(df_wide) {
 # DF.to.long <- function(simdf_wide) {	
@@ -626,7 +644,7 @@ DF.to.long <- function(df_wide) {
 NULL
 #' @import data.table
 NULL
-#' Convert \code{data.frame} into long format (faster than \code{DF.to.long})
+#' Convert Data from Wide to Long Format Using \code{dcast.data.table}
 #'
 #' This utility function takes a simulated data.frame in wide format as an input and converts it into a long format 
 #' using \pkg{data.table} package functions \code{melt.data.table} and \code{dcast.data.table}.
@@ -641,6 +659,7 @@ NULL
 #'
 #' @param df_wide A \code{data.frame} in wide format
 #' @return A \code{data.table} object in long format
+#' @family data manipulation functions
 #' @export
 DF.to.longDT <- function(df_wide) {
 	# require('data.table')
@@ -697,7 +716,6 @@ DF.to.longDT <- function(df_wide) {
         }
         DT_l_fin
 	 }
-
 	# for each node, determinine if its baseline or time-varying
 	# if time-varying and columns are missing for some of its time-points => impute those time-points as NA (last ifelse)
 	for (cur_node_name in node_nms_unq) {
@@ -706,7 +724,6 @@ DF.to.longDT <- function(df_wide) {
 		node_t_vals <- unlist(sapply(node_nms_split, function(t_nodename) if(t_nodename[1]%in%cur_node_name) as.integer(t_nodename[2])))
 		# if node name has no "_", assume its bsl and assign first time-point:
 		if (all(is.na(node_t_vals))) node_t_vals <- all_ts[1] 
-
 		dprint("cur_node_name: "%+%cur_node_name);
 		dprint("all_ts"); dprint(all_ts)
 		# dprint("idx_node"); dprint(idx_node)
@@ -735,7 +752,6 @@ DF.to.longDT <- function(df_wide) {
 	}
 	dprint("v.names"); dprint(v.names)
 	dprint("bsl.names"); dprint(bsl.names)
-
 	#*** the baseline variable names are also passed as last arg
 	simDT_long <- DF.to.longDT_run(dat_df=df_wide, t_pts=all_ts, lvars=v.names, bslvars=bsl.names)
 	if (length(attnames)>0) v.names <- v.names[!v.names%in%attnames]
@@ -745,7 +761,6 @@ DF.to.longDT <- function(df_wide) {
 	attr(simDT_long, "v.names") <- v.names
 	simDT_long
 }
-
 
 # NOT IMPLEMENTED
 # will convert the dataset back to wide format from long, get the necessary attributes from simdf_long
@@ -758,7 +773,6 @@ DF.to.longDT <- function(df_wide) {
 #     # node_nms_unq <- unique(sapply(node_nms_split, '[', 1))
 # 	varying <- list()
 # 	v.names <- NULL
-
 # 	simdf_wide <- reshape(data=simdf_long, idvar=, varying=varying, v.names=v.names, timevar = "t", times = all_ts, sep="_", direction="wide")
 # 	simdf_wide
 # }

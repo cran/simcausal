@@ -1,6 +1,6 @@
 
-
-# (EXPERIMENTAL) Estimate node mean target parameters from the simulated observed data
+# nocov start
+# (EXPERIMENTAL) Estimate Node Mean Target Parameters from the Simulated Observed Data
 #
 # Performs estimation of the mean target parameter using the simulated observational data. Currently only \pkg{ltmle} package can be used for estimation, which has to be installed before calling this function. Please note, this is an experimental feature that hasn't been fully tested yet, \strong{use at your own risk}.
 # @param DAG Object specifying the directed acyclic graph for the observed data, must have a well-defined MSM target parameter (\code{set.target.MSM()})
@@ -120,7 +120,7 @@ est.targetE <- function(DAG, obs_df, Aname="A", Cname="C", Lnames, package="ltml
 	#---------------------------------------------------------------------------------------
 	# If the outcome is survival need to carry forward last observation with doLTCF function
 	#---------------------------------------------------------------------------------------
-	obs_df <- doLTCF(data=obs_df, outcome=outnodes$gen_name)
+	obs_df <- doLTCF(data=obs_df, LTCF=outnodes$gen_name)
 	#---------------------------------------------------------------------------------------
 
 	#---------------------------------------------------------------------------------------
@@ -350,7 +350,7 @@ est.targetMSM <- function(DAG, obs_df, Aname="A", Cname="C", Lnames, Ytvec, ACLt
 	#---------------------------------------------------------------------------------------
 	# If the outcome is survival need to carry forward last observation with doLTCF function
 	#---------------------------------------------------------------------------------------
-	obs_df <- doLTCF(data=obs_df, outcome=outnodes$gen_name)
+	obs_df <- doLTCF(data=obs_df, LTCF=outnodes$gen_name)
 	#---------------------------------------------------------------------------------------
 
 	#---------------------------------------------------------------------------------------
@@ -397,4 +397,4 @@ est.targetMSM <- function(DAG, obs_df, Aname="A", Cname="C", Lnames, Ytvec, ACLt
 	list(regimens_arr=regimens_arr, summeas_arr=summeas_arr)
 
 }
-
+# nocov end

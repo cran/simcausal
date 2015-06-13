@@ -7,9 +7,9 @@ opts <- new.env(parent = emptyenv())
 opts$vecfun <- NULL
 opts$debug <- FALSE
 
-#' Print names of custom vectorized functions
+#' Print Names of Custom Vectorized Functions
 #'
-#' Print current user-defined vectorized function names
+#' Print current user-defined vectorized function names.
 #' @return A vector of vectorized function names
 #' @export
 vecfun.print <- function() { 
@@ -18,9 +18,9 @@ vecfun.print <- function() {
   print("current list of user-defined vectorized functions: "%+%new)
   invisible(opts$vecfun)
 }
-#' Print names of all vectorized functions
+#' Print Names of All Vectorized Functions
 #'
-#' Print all vectorized function names (build-in and user-defined)
+#' Print all vectorized function names (build-in and user-defined).
 #' @return A vector of build-in and user-defined vectorized function names
 #' @export
 vecfun.all.print <- function() { 
@@ -30,7 +30,7 @@ vecfun.all.print <- function() {
   print("user-defined vectorized functions: "%+%new)
   invisible(c(vector_ops_fcns,vector_math_fcns,new))
 }
-#' Add custom vectorized functions
+#' Add Custom Vectorized Functions
 #'
 #' Add user-defined function names to a global list of custom vectorized functions. The functions in \code{vecfun_names} are intended for use inside the node formulas. Adding functions to this list will generally greatly expedite the simulation run time. Any node formula calling a function on this list will be evaluated "as is", the function should be written to accept arguments as either vectors of length \code{n} or as matrices with \code{n} rows. Adding function to this list will effects simulation from all DAG objects that call this function. See vignette for more details.
 #' @param vecfun_names A character vector of function names that will be treated as "vectorized" by the node formula R parser
@@ -44,7 +44,7 @@ vecfun.add <- function(vecfun_names) { # Add vectorized function to global custo
   print("current list of user-defined vectorized functions: "%+%new)
   invisible(old)
 }
-#' Remove custom vectorized functions
+#' Remove Custom Vectorized Functions
 #'
 #' Remove user-defined function names from a global list of custom vectorized functions. See vignette for more details.
 #' @param vecfun_names A character vector of function names that will be removed from the custom list
@@ -67,7 +67,7 @@ vecfun.remove <- function(vecfun_names) { # Remove vectorized functions to globa
   print("current list of user-defined vectorized functions: "%+%new)
   invisible(old)
 }
-#' Reset custom vectorized function list
+#' Reset Custom Vectorized Function List
 #'
 #' Reset a listing of user-defined vectorized functions.
 #' @return An old vector of user-defined vectorized function names
@@ -77,7 +77,6 @@ vecfun.reset <- function() {
   opts$vecfun <- NULL
   invisible(old)
 }
-
 vecfun.get <- function() opts$vecfun
 get_opts <- function() opts$debug # Return Current Debug Mode Setting
 debug_set <- function() { # Set to Debug Mode
@@ -123,18 +122,19 @@ is.DAGlocked <- function(DAG) (!is.null(attr(DAG, "locked"))&&attr(DAG, "locked"
 get.actname <- function(DAG) attr(DAG, "actname")
 
 #' Print DAG Object
-#' @param x A DAG object
-#' @param ... Other arguments to generic print
+#' @param x A DAG object.
+#' @param ... Other arguments to generic print.
 #' @export
 print.DAG <- function(x, ...) {
 	idx_nodes <- (!sapply(x, is.attrnode, x))
 	x_notnull <- lapply(x, function(node) node[!sapply(node, is.null)])
-	str(x_notnull[idx_nodes])
+	print(str(x_notnull[idx_nodes]))
+  invisible(x)
 }
 
 #' Print Action Object
-#' @param x An object
-#' @param ... Other arguments to generic print
+#' @param x An object.
+#' @param ... Other arguments to generic print.
 #' @export
 print.DAG.action <- function(x, ...) {
   actnodes <- unique(attr(x, "actnodes"))
@@ -146,11 +146,9 @@ print.DAG.action <- function(x, ...) {
       actnodes <- paste0(actnodes, collapse=",")
     }
   }
-
   print("Action: "%+%attr(x, "actname"))
   print("ActionNodes: "%+%actnodes)
   print("ActionAttributes: "); print(attr(x, "attrs"))
-
   res <- list(
       Action=attr(x, "actname"),
       ActionNodes=attr(x, "actnodes"), 
@@ -160,33 +158,31 @@ print.DAG.action <- function(x, ...) {
 
 
 #' Print DAG.node Object
-#' @param x A Node object
-#' @param ... Other arguments to generic print
+#' @param x A Node object.
+#' @param ... Other arguments to generic print.
 #' @export
 print.DAG.node <- function(x, ...) str(x)
 
-#' (EXPERIMENTAL) Plot Survival
+#' (EXPERIMENTAL) Plot Discrete Survival Function(s)
 #'
-#' Plot survival curves given a list of survival outcomes
-#' @param surv_res_est A list of vectors containing action-specific discrete survival values over time
-#' @param xindx A vector of indices for subsetting each of the survival survival vectors in surv_res_est
-#' @param y_lab A character vector for labeling y axis
-#' @param miny Minimum y to plot, 0 to 1
-#' @param maxy Maximum y to plot, 0 to 1
+#' Plot discrete survival curves from a list of discrete survival probabilities by calling \code{plot} with \code{type='b'}.
+#' @param surv A list of vectors, each containing action-specific discrete survival probabilities over time.
+#' @param xindx A vector of indices for subsetting the survival vectors in \code{surv}, if omitted all survival probabilities in each \code{surv[[i]]} are plotted.
+#' @param ylab An optional title for y axis, passed to \code{plot}.
+#' @param xlab An optional title for x axis, passed to \code{plot}.
+#' @param ylim Optional y limits for the plot, passed to \code{plot}.
+#' @param ... Additional arguments passed to \code{plot}.
 #' @export
-# f_plot_survest
-plotSurvEst <- function(surv_res_est=list(), xindx=NULL, y_lab="", miny=0.0, maxy=1.0) {
+plotSurvEst <- function(surv = list(), xindx = NULL, ylab = '', xlab = 't', ylim = c(0.0, 1.0), ...) {
   ptsize <- 0.7
   counter <- 0
-  for(d.j in names(surv_res_est)){
+  for(d.j in names(surv)){
     counter <- counter+1
-    if (is.null(xindx)) xindx <- seq(surv_res_est[[d.j]])
-    plot(xindx,surv_res_est[[d.j]][xindx],col=counter,type='b',cex=ptsize, 
-      ylim=c(miny,maxy),
-      ylab=y_lab,xlab="Quarter since study entry")
+    if (is.null(xindx)) xindx <- seq(surv[[d.j]])
+    plot(x=xindx, y=surv[[d.j]][xindx], col=counter, type='b', cex=ptsize, ylab=ylab, xlab=xlab, ylim=ylim)
     par(new=TRUE)
   }
-  legend(12,0.96,legend=names(surv_res_est),col=c(1:length(names(surv_res_est))), cex=ptsize, pch=1)
+  legend(12,0.96, legend=names(surv), col=c(1:length(names(surv))), cex=ptsize, pch=1)
 }
 
 #' Plot DAG
@@ -194,8 +190,8 @@ plotSurvEst <- function(surv_res_est=list(), xindx=NULL, y_lab="", miny=0.0, max
 #' Plot a DAG object using functions from \code{igraph} package.
 #' @param DAG A DAG object that was specified by calling \code{\link{set.DAG}}
 #' @param tmax Maximum time-point to plot for time-varying DAG objects
-#' @param xjitter Amount of jitter for node x-axis plotting coordinates
-#' @param yjitter Amount of jitter for node y-axis plotting coordinates
+#' @param xjitter Amount of random jitter for node x-axis plotting coordinates
+#' @param yjitter Amount of random jitter for node y-axis plotting coordinates
 #' @param node.action.color Color of the action node labels (only for action DAG of class DAG.action). If missing, defaults to red.
 #' @param vertex_attrs A named list of \code{igraph} graphical parameters for plotting DAG vertices. These parameters are passed on to \code{add.vertices} \code{igraph} function.
 #' @param edge_attrs A named list of \code{igraph} graphical parameters for plotting DAG edges. These parameters are passed on to \code{add.edges} \code{igraph} function.
@@ -322,8 +318,8 @@ plotDAG <- function(DAG, tmax=NULL, xjitter, yjitter, node.action.color, vertex_
       edge_attrs_default <- list(color="black", width=0.2, arrow.width=arrow.width, arrow.size=arrow.size)
       vertex_attrs <- append(vertex_attrs, vertex_attrs_default[!(names(vertex_attrs_default)%in%attnames_ver)])
       edge_attrs <- append(edge_attrs, edge_attrs_default[!(names(edge_attrs_default)%in%attnames_edge)])
-      print("using the following vertex attributes: "); print(vertex_attrs)
-      print("using the following edge attributes: "); print(edge_attrs)
+      message("using the following vertex attributes: "); message(vertex_attrs)
+      message("using the following edge attributes: "); message(edge_attrs)
 
       g <- igraph::graph.empty()
       # g <- igraph::add.vertices(g, nv=length(names(par_nodes)), color=NA, shape="circle", size=vertsize, label.cex=0.5, label.dist=0)
@@ -401,104 +397,13 @@ check_expanded <- function(inputDAG) {
 	}
 }
 
-#' Create and lock DAG object
+#' Create and Lock DAG Object
 #'
 #' Check current DAG (created with \code{node}) for errors and consistency of its node distributions, set the observed data generating distribution. Attempts to simulates several observations to catch any errors in DAG definition. New nodes cannot be added after function set.DAG has been applied.
 #' @param DAG Named list of node objects that together will form a DAG. Temporal ordering of nodes is either determined by the order in which the nodes were added to the DAG (using \code{+node(...)} interface) or with an optional "order" argument to \code{node()}.
 #' @param vecfun A character vector with names of the vectorized user-defined node formula functions. See examples and the vignette for more information.
-#' @return A DAG (S3) object, which is a list consisting of node object(s) sorted by their temporal order
-#' @examples
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 1A: Define some Bernoulli nodes, survival outcome Y and put it together in a 
-#'# DAG object
-#'#---------------------------------------------------------------------------------------
-#'W1 <- node(name="W1", distr="rbern", prob=plogis(-0.5), order=1)
-#'W2 <- node(name="W2", distr="rbern", prob=plogis(-0.5 + 0.5*W1), order=2)
-#'A <- node(name="A", distr="rbern", prob=plogis(-0.5 - 0.3*W1 - 0.3*W2), order=3)
-#'Y <- node(name="Y", distr="rbern", prob=plogis(-0.1 + 1.2*A + 0.3*W1 + 0.3*W2), order=4)
-#'D1A <- set.DAG(c(W1,W2,A,Y))
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 1B: Same as 1A using +node interface and no order argument
-#'#---------------------------------------------------------------------------------------
-#'D1B <- DAG.empty()
-#'D1B <- D1B + node(name="W1", distr="rbern", prob=plogis(-0.5))
-#'D1B <- D1B + node(name="W2", distr="rbern", prob=plogis(-0.5 + 0.5*W1))
-#'D1B <- D1B + node(name="A", distr="rbern", prob=plogis(-0.5 - 0.3*W1 - 0.3*W2))
-#'D1B <- D1B + node(name="Y", distr="rbern", prob=plogis(-0.1 + 1.2*A + 0.3*W1 + 0.3*W2))
-#'D1B <- set.DAG(D1B)
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 1C: Same as 1A and 1B using add.nodes interface and no order argument
-#'#---------------------------------------------------------------------------------------
-#'D1C <- DAG.empty()
-#'D1C <- add.nodes(D1C, node(name="W1", distr="rbern", prob=plogis(-0.5)))
-#'D1C <- add.nodes(D1C, node(name="W2", distr="rbern", prob=plogis(-0.5 + 0.5*W1)))
-#'D1C <- add.nodes(D1C, node(name="A", distr="rbern", prob=plogis(-0.5 - 0.3*W1 - 0.3*W2)))
-#'D1C <- add.nodes(D1C, node(name="Y", distr="rbern", prob=plogis(-0.1 + 1.2*A + 0.3*W1 + 0.3*W2)))
-#'D1C <- set.DAG(D1C)
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 1D: Add a uniformly distributed node and redefine outcome Y as categorical
-#'#---------------------------------------------------------------------------------------
-#'D_unif <- DAG.empty()
-#'D_unif <- D_unif + node("W1", distr="rbern", prob=plogis(-0.5))
-#'D_unif <- D_unif + node("W2", distr="rbern", prob=plogis(-0.5 + 0.5*W1))
-#'D_unif <- D_unif + node("W3", distr="runif", min=plogis(-0.5 + 0.7*W1 + 0.3*W2), max=10)
-#'D_unif <- D_unif + node("Anode", distr="rbern", prob=plogis(-0.5 - 0.3*W1 - 0.3*W2 - 0.2*sin(W3)))
-#' # Categorical syntax 1 (probabilities as values)
-#'D_cat_1 <- D_unif + node("Y", distr="rcategor", probs={0.3;0.4})
-#' # Categorical syntax 2 (probabilities as formulas)
-#'D_cat_2 <- D_unif + node("Y", distr="rcategor", 
-#'                          probs={plogis(-0.1 + 1.2*Anode + 0.3*W1 + 0.3*W2 + 0.2*cos(W3)); 
-#'                                 plogis(-0.5 + 0.7*W1)})
-#'D_cat_1 <- set.DAG(D_cat_1)
-#'D_cat_2 <- set.DAG(D_cat_2)
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 1E: Defining new distribution function 'rbern', defining and passing a custom 
-#'# vectorized node function 'customfun'
-#'#---------------------------------------------------------------------------------------
-#'rbern <- function(n, prob) { # defining a bernoulli wrapper based on R rbinom function
-#'  rbinom(n=n, prob=prob, size=1)
-#'}
-#'customfun <- function(arg, lambda) {
-#'  res <- ifelse(arg==1,lambda,0.1)
-#'  res
-#'}
-#'D <- DAG.empty()
-#'D <- D + node("W1", distr="rbern", prob=0.05)
-#'D <- D + node("W2", distr="rbern", prob=customfun(W1,0.5))
-#'D <- D + node("W3", distr="rbern", prob=ifelse(W1==1,0.5,0.1))
-#'D1d <- set.DAG(D, vecfun=c("customfun"))
-#'sim1d <- simobs(D1d, n=200, rndseed=1)
-#'
-#'#---------------------------------------------------------------------------------------
-#'# EXAMPLE 2: Define time varying nodes for time points t = 0 to 16
-#'#---------------------------------------------------------------------------------------
-#'t_end <- 16
-#'DTV <- DAG.empty()
-#'DTV <- DTV + node(name="L2", t=0, distr="rbern", prob=0.05)
-#'DTV <- DTV + node(name="L1", t=0, distr="rbern", prob=ifelse(L2[0]==1,0.5,0.1))
-#'DTV <- DTV + node(name="A1", t=0, distr="rbern", 
-#' 	prob=ifelse(L1[0]==1 & L2[0]==0, 0.5, ifelse(L1[0]==0 & L2[0]==0, 0.1, 
-#'                                          ifelse(L1[0]==1 & L2[0]==1, 0.9, 0.5))))
-#'DTV <- DTV + node(name="A2", t=0, distr="rbern", 
-#' 	prob=0)
-#'DTV <- DTV + node(name="Y",  t=0, distr="rbern", 
-#' 	prob=plogis(-6.5 + L1[0] + 4*L2[0] + 0.05*I(L2[0]==0)), EFU=TRUE)
-#'DTV <- DTV + node(name="L2", t=1:t_end, distr="rbern", 
-#' 	prob=ifelse(A1[t-1]==1, 0.1, ifelse(L2[t-1]==1, 0.9, min(1,0.1 + t/.(t_end)))))
-#'DTV <- DTV + node(name="A1", t=1:t_end, distr="rbern", 
-#' 	prob=ifelse(A1[t-1]==1, 1, ifelse(L1[0]==1 & L2[0]==0, 0.3, 
-#'                               ifelse(L1[0]==0 & L2[0]==0, 0.1, 
-#'                                ifelse(L1[0]==1 & L2[0]==1, 0.7, 0.5)))))
-#'DTV <- DTV + node(name="A2", t=1:t_end, distr="rbern", 
-#' 	prob=0, order=8+4*(0:(t_end-1)))
-#'DTV <- DTV + node(name="Y", t=1:t_end, distr="rbern", 
-#' 	prob=plogis(-6.5 + L1[0] + 4*L2[t] + 0.05*sum(I(L2[0:t]==rep(0,(t+1))))), EFU=TRUE)
-#'DTV <- set.DAG(DTV)
+#' @return A DAG (S3) object, which is a list consisting of node object(s) sorted by their temporal order.
+#' @example tests/RUnit/set.DAG.R
 #' @export
 set.DAG <- function(DAG, vecfun) {
   rndseed <- NULL
@@ -675,7 +580,8 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
         gnode_idx <- which(DAG_names%in%gattr_nm)
         modDAG.full <- modDAG.full[-gnode_idx]
         class(modDAG.full) <- "DAG"
-        warning("existing non-time-varying attribute "%+% gattr_nm %+% " was overwritten with a time-varying attribute")
+        warning("\nAction: " %+% actname %+% "; Attribute: " %+% gattr_nm %+% ".\nScalar attribute value is overwritten by a vector of time-varying values.")
+        # warning("\nNon-time-varying attribute ("%+% gattr_nm %+% ") was overwritten by time-varying attribute values")
       }
       # for generic node being added (theta), need to check that no TV nodes under the same name already exist (theta_i)
       if (!checkgenexist) { # the generic (nonTV) node doesn't exist yet but the TV node already does
@@ -684,7 +590,8 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
           gnode_idx <- which(gennamesall%in%gattr_nm)
           modDAG.full <- modDAG.full[-gnode_idx]
           class(modDAG.full) <- "DAG"
-          warning("existing time-varying attribute "%+% gattr_nm %+% " was overwritten with a non-time-varying attribute")
+          warning("\nAction: " %+% actname %+% "; Attribute: " %+% gattr_nm %+% ".\nVector of time-varying attribute values is overwritten by a single scalar value.")
+          # warning("\nTime-varying attribute ("%+% gattr_nm %+% ") was overwritten by non-time-varying attribute values")
         }
       }
       # either add or overwrite existing attribute values
