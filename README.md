@@ -5,7 +5,7 @@ simcausal
 <!-- [![Travis-CI Build Status](https://travis-ci.org/osofr/simcausal.svg?branch=master)](https://travis-ci.org/osofr/simcausal) -->
 [![](http://cranlogs.r-pkg.org/badges/simcausal)](http://cran.rstudio.com/web/packages/simcausal/index.html)
 [![Travis-CI Build Status](https://travis-ci.org/osofr/simcausal.svg?branch=master)](https://travis-ci.org/osofr/simcausal)
-[![Coverage Status](https://coveralls.io/repos/osofr/simcausal/badge.png?branch=master)](https://coveralls.io/r/osofr/simcausal)
+[![Coverage Status](https://coveralls.io/repos/osofr/simcausal/badge.svg?branch=master&service=github)](https://coveralls.io/github/osofr/simcausal?branch=master)
 
 The `simcausal` R package is a tool for specification and simulation of complex longitudinal data structures that are based on structural equation models. The package aims to provide a flexible tool for simplifying the conduct of transparent and reproducible simulation studies, with a particular emphasis on the types of data and interventions frequently encountered in typical causal inference problems, such as, observational data with time-dependent confounding, selection bias, and random monitoring processes. 
 
@@ -32,9 +32,9 @@ devtools::install_github('osofr/simcausal', build_vignettes = FALSE)
 
 ### Documentation
 
-Once the package is installed, please read the vignette, consult the internal package documentation and examples. 
+Once the package is installed, please read the [vignette](http://cran.r-project.org/web/packages/simcausal/vignettes/simcausal_vignette.pdf), consult the internal package documentation and examples. 
 
-* To see the package vignette:
+* To see the vignette in R:
 
 ```R
 vignette("simcausal_vignette", package="simcausal")

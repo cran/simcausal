@@ -71,7 +71,7 @@ add.nodes <- function(DAG, nodes) {
       class(modDAG) <- "DAG"
     } else { # this node name already exist in the DAG, existing node is overwritten
       modDAG <- modDAGnode(modDAG, nodes[[node_idx]])
-      warning("existing node "%+% nodes[[node_idx]]$name %+% " was modified")
+      message("existing node "%+% nodes[[node_idx]]$name %+% " was modified")
     } 
   }
   return(modDAG)
@@ -121,9 +121,9 @@ add.action <- function(DAG, name, nodes, ..., attr=list()) {
   if (missing(nodes)) stop("please specify action node(s)")
   curr.names <- names(attr(DAG, "actions"))
   if (name %in% curr.names) {	# modify currently existing DAG
-  	attr(DAG, "actions")[[name]] <- setAction(actname=name, inputDAG=attr(DAG, "actions")[[name]], actnodes=nodes, attr=attrs)
+  	attr(DAG, "actions")[[name]] <- setAction(actname = name, inputDAG = attr(DAG, "actions")[[name]], actnodes = nodes, attr = attrs)
   } else { # create a new action
-    new.action <- list(setAction(actname=name, inputDAG=DAG, actnodes=nodes, attr=attrs))
+    new.action <- list(setAction(actname = name, inputDAG = DAG, actnodes = nodes, attr = attrs))
   	names(new.action) <- name
   	attr(DAG, "actions") <- c(attr(DAG, "actions"), new.action)
   }
@@ -181,11 +181,15 @@ DAG.empty <- function() {
     dprint("name"); dprint(name)
     dprint("nodes"); dprint(nodes)
     dprint("attr"); dprint(attr)
-    res <- add.action(DAG=obj1, name=name, nodes=nodes, attr=attr)
+    res <- add.action(DAG = obj1, name = name, nodes = nodes, attr = attr)
   } else if ("DAG.nodelist" %in% class(obj2)) {
     # res <- c(obj1, obj2)
     # class(res) <- "DAG"
-    res <- add.nodes(DAG=obj1, nodes=obj2)
+    res <- add.nodes(DAG = obj1, nodes = obj2)
+  } else if ("DAG.netlist" %in% class(obj2)) {
+    if (!is.null(attr(obj1, "DAG.net"))) message("overwriting previously defined network object")
+    res <- add.nodes(DAG = obj1, nodes = obj2)
+    attr(res, "DAG.net") <- obj2
   } else {
     stop("Cannot add unknown type to DAG")
   }

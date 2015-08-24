@@ -544,7 +544,7 @@ A(Dset)[["A0"]]$Anode
   Ddyntry <- Ddyntry + action("A1_th0", nodes = act_theta, theta = 1, newparam = 100)
   A(Ddyntry)[["A1_th0"]]
 
-## ---------------------------------------------------------------------------------------
+## ----message=FALSE, warning=FALSE-------------------------------------------------------
   act_theta_t <-c(node("A1",t = 0, distr = "rbern", 
                       prob = ifelse(L2[0] >=  theta[t], 1, 0)),
                   node("A1",t = 1:t.end, distr = "rbern", 
