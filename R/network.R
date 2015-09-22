@@ -147,7 +147,7 @@ igraph.to.sparseAdjMat <- function(igraph_network) {
 #' @seealso \code{\link{network}}; \code{\link{NetInd.to.sparseAdjMat}}; \code{\link{sparseAdjMat.to.igraph}}; \code{\link{igraph.to.sparseAdjMat}};
 #' @export
 sparseAdjMat.to.NetInd <- function(sparseAdjMat) {
-  assertthat::assert_that("dgCMatrix" %in% class(sparseAdjMat))
+  assertthat::assert_that(is(sparseAdjMat, "sparseMatrix"))
   # sparseAdjMat:
     # i: These are the 0-based row numbers for each non-zero element in the matrix.
     # Object of class "integer" of length nnzero (number of non-zero elements). These are the 0-
@@ -176,6 +176,7 @@ sparseAdjMat.to.NetInd <- function(sparseAdjMat) {
   stopifnot(nnonzero==sparseAdjMat@p[ncol(sparseAdjMat)+1])
   return(list(NetInd_k = NetInd_k, nF = nF, Kmax = Kmax))
 }
+
 
 #' Convert Network IDs Matrix into Sparse Adjacency Matrix
 #'
@@ -249,7 +250,7 @@ netvar <- function(varnm, fidx) {
 # netvar(c("A", "W"), c(0:5, 0, 3))
 
 ## ---------------------------------------------------------------------
-#' R6 class for creating and storing a friend matrix (network IDs) for simulating network data
+#' R6 class for creating and storing a friend matrix (network IDs) for network data
 #'
 #' This R6 class defines fields and methods for creating and storing \code{NetInd_k}, 
 #' a matrix of friend indices (network IDs) of \code{dim = (nobs x Kmax)}.
@@ -260,7 +261,7 @@ netvar <- function(varnm, fidx) {
 #' @keywords R6 class
 #' @details
 #' \itemize{
-#' \item{NetInd_k} - Matrix of friend indices (network IDs) of \code{dim = (nobs x Kmax)}.
+#' \item{NetInd} - Matrix of friend indices (network IDs) of \code{dim = (nobs x Kmax)} (Active Binding).
 #' \item{nF} - Vector of integers, where \code{nF[i]} is the integer number of friends (0 to \code{Kmax}) for observation \code{i}.
 #' \item{nobs} - Number of observations
 #' \item{Kmax} - Maximum number of friends for any observation.
@@ -343,6 +344,7 @@ NetIndClass <- R6Class("NetIndClass",
         assert_that(nrow(NetInd_k) == self$nobs)
         assert_that(ncol(NetInd_k) == self$Kmax)
         self$NetInd_k[, ] <- NetInd_k
+        self$make.nF()
       }
     },
 

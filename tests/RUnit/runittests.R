@@ -24,7 +24,7 @@ if(FALSE) {
   # devtools::build(args = "--no-build-vignettes") # build package tarball compacting vignettes
   # devtools::build() # build package tarball
   setwd("..")
-  system("R CMD check --as-cran simcausal_0.3.0.tar.gz") # check R package tar ball prior to CRAN submission
+  system("R CMD check --as-cran simcausal_0.4.0.tar.gz") # check R package tar ball prior to CRAN submission
       ## system("R CMD check --no-manual --no-vignettes simcausal") # check without building the pdf manual and not building vignettes
       ## system("R CMD build simcausal --no-build-vignettes")
       ## system("R CMD build simcausal")  
@@ -1524,6 +1524,8 @@ test.experimental_parsingMSMs <- function() {
   # X_dat <- simfull(A(D), n=1000, rndseed = 123)
   MSMres <- eval.target(D, data=X_dat)
   MSMres$msm
+
+  DF.to.longDT(X_dat[[1]])
   # Coefficients:
   #                                    (Intercept)                                           theta  
   #                                     -7.7719930                                       1.7599218  
@@ -1587,6 +1589,10 @@ test.experimental_parsingMSMs <- function() {
                                               dat
                                               })
   X_dat_MSMsum_lDT <- lapply(X_dat_MSMsum, DF.to.longDT)
+
+
+  DF.to.longDT(X_dat_MSMsum[[1]])
+
   # ---
   df_combine_DT <- data.table::rbindlist(X_dat_MSMsum_lDT, fill=TRUE)
   head(df_combine_DT,100)

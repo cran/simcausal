@@ -536,12 +536,14 @@ A(Dset)[["A0"]]$Anode
 
 ## ----message=FALSE----------------------------------------------------------------------
   A(Ddyn)[["A1_th0"]]$A1_0
-  Ddyntry <- Ddyn + action("A1_th0", nodes = node("A1", t = 0, distr = "rbern", prob = 0))
+  Ddyntry <- Ddyn + 
+    action("A1_th0", nodes = node("A1", t = 0, distr = "rbern", prob = 0))
   A(Ddyntry)[["A1_th0"]]$A1_0
 
 ## ----message=FALSE----------------------------------------------------------------------
   A(Ddyntry)[["A1_th0"]]
-  Ddyntry <- Ddyntry + action("A1_th0", nodes = act_theta, theta = 1, newparam = 100)
+  Ddyntry <- Ddyntry + 
+    action("A1_th0", nodes = act_theta, theta = 1, newparam = 100)
   A(Ddyntry)[["A1_th0"]]
 
 ## ----message=FALSE, warning=FALSE-------------------------------------------------------
