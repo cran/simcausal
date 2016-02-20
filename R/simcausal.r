@@ -1,3 +1,4 @@
+#' @import igraph
 
 `%+%` <- function(a, b) paste0(a, b)	# custom cat function
 `%/%` <- function(a, b) paste0(a, paste0(b, collapse=","))  # custom collapse with "," function
@@ -48,7 +49,12 @@ vecfun.all.print <- function() {
 }
 #' Add Custom Vectorized Functions
 #'
-#' Add user-defined function names to a global list of custom vectorized functions. The functions in \code{vecfun_names} are intended for use inside the node formulas. Adding functions to this list will generally greatly expedite the simulation run time. Any node formula calling a function on this list will be evaluated "as is", the function should be written to accept arguments as either vectors of length \code{n} or as matrices with \code{n} rows. Adding function to this list will effects simulation from all DAG objects that call this function. See vignette for more details.
+#' Add user-defined function names to a global list of custom vectorized functions. 
+#' The functions in \code{vecfun_names} are intended for use inside the node formulas. 
+#' Adding functions to this list will generally greatly expedite the simulation run time. 
+#' Any node formula calling a function on this list will be evaluated "as is", the function should 
+#' be written to accept arguments as either vectors of length \code{n} or as matrices with \code{n} rows. 
+#' Adding function to this list will effects simulation from all DAG objects that call this function. See vignette for more details.
 #' @param vecfun_names A character vector of function names that will be treated as "vectorized" by the node formula R parser
 #' @return An old vector of user-defined vectorized function names
 #' @export
@@ -113,7 +119,11 @@ is.DAG <- function(DAG) (("DAG" %in% class(DAG)) || ("DAG.action" %in% class(DAG
 is.DAG.action <- function(DAG) ("DAG.action" %in% class(DAG)) # check its a DAG.action object
 is.DAGnodelist <- function(DAG) "DAG.nodelist" %in% class(DAG) # check its a DAG object
 is.node <- function(node) "DAG.node" %in% class(node) # check its a DAG.node object
-is.EFUP <- function(node) (!is.null(node$EFU))&&(node$EFU) # if the node is end follow-up when value = 1 (EFUP)
+is.Netnode <- function(node) "DAG.net" %in% class(node) # check its a DAG.net object (network node)
+
+is.EFUP <- function(node) (!is.null(node$EFU)) # if the node is end follow-up when value = 1 (EFUP)
+# is.EFUP <- function(node) (!is.null(node$EFU))&&(node$EFU) # if the node is end follow-up when value = 1 (EFUP)
+
 is.Bern <- function(node) {
   (node$distr%in%"Bern"||node$distr%in%"rbern") 		# if the node is Bernoulli random variable
 }
@@ -187,7 +197,8 @@ print.DAG.node <- function(x, ...) str(x)
 #' @param ylab An optional title for y axis, passed to \code{\link{plot}}.
 #' @param xlab An optional title for x axis, passed to \code{\link{plot}}.
 #' @param ylim Optional y limits for the plot, passed to \code{\link{plot}}.
-#' @param legend.xyloc Optional x and y co-ordinates to be used to position the legend. Can be specified by keyword or as a named list with (x,y), uses the same convention as in \code{graphics::xy.coords}.
+#' @param legend.xyloc Optional x and y co-ordinates to be used to position the legend. 
+#' Can be specified by keyword or as a named list with (x,y), uses the same convention as in \code{graphics::xy.coords}.
 #' @param ... Additional arguments passed to \code{\link{plot}}.
 #' @export
 plotSurvEst <- function(surv = list(), xindx = NULL, ylab = '', xlab = 't', ylim = c(0.0, 1.0), legend.xyloc = "topright", ...) {
@@ -199,14 +210,19 @@ plotSurvEst <- function(surv = list(), xindx = NULL, ylab = '', xlab = 't', ylim
     plot(x=xindx, y=surv[[d.j]][xindx], col=counter, type='b', cex=ptsize, ylab=ylab, xlab=xlab, ylim=ylim, ...)
     par(new=TRUE)
   }
-  # alternative (coord used by vignette): 
+  # alternative (coord used by vignette):
   # legend.xyloc = list(x=12,y=0.96)
   legend(legend.xyloc, legend=names(surv), col=c(1:length(names(surv))), cex=ptsize, pch=1)
 }
 
 #' Plot DAG
 #'
-#' Plot a DAG object using functions from \code{igraph} package.
+#' Plot DAG object using functions from \code{igraph} package. 
+#' The default setting is to keep the regular (observed) DAG nodes with \code{shape} set to "none", which can be over-ridden by the user. 
+#' For latent (hidden) DAG nodes the default is to: 
+#' 1) set the node color as grey; 
+#' 2) enclose the node by a circle; and 
+#' 3) all directed edges coming out of the latent node are plotted as dashed.
 #' @param DAG A DAG object that was specified by calling \code{\link{set.DAG}}
 #' @param tmax Maximum time-point to plot for time-varying DAG objects
 #' @param xjitter Amount of random jitter for node x-axis plotting coordinates
@@ -215,7 +231,8 @@ plotSurvEst <- function(surv = list(), xindx = NULL, ylab = '', xlab = 't', ylim
 #' @param vertex_attrs A named list of \code{igraph} graphical parameters for plotting DAG vertices. These parameters are passed on to \code{add.vertices} \code{igraph} function.
 #' @param edge_attrs A named list of \code{igraph} graphical parameters for plotting DAG edges. These parameters are passed on to \code{add.edges} \code{igraph} function.
 #' @param customvlabs A named vector of custom DAG node labels (replaces node names from the DAG object).
-#' @param excludeattrs A character vector of attribute DAG nodes that shouldn't be plotted
+#' @param excludeattrs A character vector for DAG nodes that should be excluded from the plot
+# @param latentv A character vector of latent (unobserved) DAG nodes which: 1) will be colored in grey; 2) will be enclosed in a circle; and 3) have dashed directed edges.
 #' @param verbose Set to \code{TRUE} to print messages on status and information to the console. 
 #'  Turn this off by default using options(simcausal.verbose=FALSE).
 #' @export
@@ -228,6 +245,7 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
   DAG_orig <- DAG
   # Get a list of parent nodes
   par_nodes <- attr(DAG, "parents")
+  latent.v <- attr(DAG, "latent.v")
   # Get a list of attributes
   # attrs <- attr(DAG, "attrs")
   # print("par_nodes"); print(par_nodes)
@@ -255,6 +273,16 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
     }
   }
 
+  # Remove nodes that are part of vector "excludeattrs":
+  if (!missing(excludeattrs)) {
+    excl.nodes <- names(par_nodes)%in%excludeattrs
+    if (sum(excl.nodes)>0) {
+      par_nodes <- par_nodes[!excl.nodes]
+      DAG <- DAG[!excl.nodes]
+      class(DAG) <- "DAG"
+    }
+  }
+
   # Define x-axis coordinates
   x_layout <- c(0:(length(par_nodes)-1))
   if (!missing(xjitter)) {
@@ -273,9 +301,9 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
 
   	tmax <- 0
     num_bsl <- length(par_nodes)
-    # num_bsl <- length(DAG)
     num_tv <- 0
-    y_bsl <- rep(c(0,1), length.out = num_bsl) + rnorm(num_bsl)     # y placement for bsl nodes
+    # y_bsl <- rep(c(0,1), length.out = num_bsl) + rnorm(n = num_bsl)     # y placement for bsl nodes
+    y_bsl <- rep(c(0,1), length.out = num_bsl)     # y placement for bsl nodes
     y_layout <- y_bsl
 
   # Plot when t nodes are present:
@@ -335,13 +363,13 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
   if (length(edge_attrs) != 0 && (is.null(attnames_edge) || any(attnames_edge==""))) {
     stop("please specify name for each attribute in edge_attrs")
   }
-  vertex_attrs_default <- list(color=NA, shape="circle", size=vertsize, label.cex=0.5, label.dist=0)
-  edge_attrs_default <- list(color="black", width=0.2, arrow.width=arrow.width, arrow.size=arrow.size)
+  vertex_attrs_default <- list(color=NA, label.color = "darkblue", shape="none", size=vertsize, label.cex=0.5, label.dist=0)
+  edge_attrs_default <- list(color="black", width=0.2, lty=1, arrow.width=arrow.width, arrow.size=arrow.size)
   vertex_attrs <- append(vertex_attrs, vertex_attrs_default[!(names(vertex_attrs_default)%in%attnames_ver)])
   edge_attrs <- append(edge_attrs, edge_attrs_default[!(names(edge_attrs_default)%in%attnames_edge)])
   if (verbose) {
     message("using the following vertex attributes: "); message(vertex_attrs)
-    message("using the following edge attributes: "); message(edge_attrs)    
+    message("using the following edge attributes: "); message(edge_attrs)
   }
 
   g <- igraph::graph.empty()
@@ -352,9 +380,10 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
   igraph::V(g)$name <- vlabs
   for (i in c(1:length(names(par_nodes)))) {
     if (length(par_nodes[[i]])>0) {
-      # check that parent nodes actually exist and already have been defined:
+      # check that parent nodes exist and already have been defined:
       parents_i <- par_nodes[[i]]
-      ind_parexist <- parents_i%in%(names(par_nodes)[1:i])
+      # ind_parexist <- parents_i%in%(names(par_nodes)[1:i])
+      ind_parexist <- parents_i%in%(names(par_nodes))
       if (!all(ind_parexist)) {
         par_outvec <- parents_i[!ind_parexist]
         if (length(par_outvec)>1) par_outvec <- paste0(par_outvec, collapse=",")
@@ -369,16 +398,32 @@ plotDAG <- function(DAG, tmax = NULL, xjitter, yjitter, node.action.color, verte
       }
     }
   }
-  # mark intervention node labels with another color
+  # mark intervention node labels with another color:
   if ("DAG.action"%in%class(DAG_orig)) {
     actnodenames <- attr(DAG_orig, "actnodes")
     if (missing(node.action.color)) node.action.color <- "red"
-    # V(g)[name%in%actnodenames]$color <-"red"
     igraph::V(g)[igraph::V(g)$name%in%actnodenames]$label.color <- node.action.color
   }
-  if (!missing(customvlabs)) {  # use user-supplied custom labels for DAG nodes
+  # setting attributes for latent variables
+  if (!is.null(latent.v)) {
+    latent.idx <- which(names(par_nodes)%in%latent.v)
+
+    # shift the y.grid for latent vars (U) by -0.25 of the minimum y value:
+    min.y <- min(layoutcustom_2[, 2])
+    max.y <- max(layoutcustom_2[, 2])
+    layoutcustom_2[latent.idx, 2] <- min.y-0.25
+
+    igraph::V(g)[igraph::V(g)$name%in%latent.v]$label.color <- "black"
+    igraph::V(g)[igraph::V(g)$name%in%latent.v]$shape <- "circle"
+    # igraph::E(g)[from(igraph::V(g)[igraph::V(g)$name%in%latent.v])]$lty <- 2 # dashed
+    # to prevent a NOTE from using undeclared global "from" in igraph indexing
+    Eg.sel <- eval(parse(text="igraph::E(g)[from(igraph::V(g)[igraph::V(g)$name%in%latent.v])]$lty <- 5")) # long dash
+  }
+  # use user-supplied custom labels for DAG nodes:
+  if (!missing(customvlabs)) {
     igraph::V(g)$name <- customvlabs
   }
+  # print("layoutcustom_2: "); print(layoutcustom_2)
   g <- igraph::set.graph.attribute(g,'layout',layoutcustom_2)
   igraph::plot.igraph(g, asp=0.5)
 }
@@ -410,7 +455,8 @@ parents <- function(DAG, nodesChr) {
 
 # Internal function that checks all DAG node objects have unique name attributes
 check_namesunique <- function(inputDAG) {
-	node_names <- sapply(inputDAG, "[[", "name")
+	# node_names <- sapply(inputDAG, "[[", "name")
+  node_names <- names(inputDAG)
 	(length(unique(node_names))==length(inputDAG))
 }
 
@@ -425,34 +471,37 @@ check_expanded <- function(inputDAG) {
 
 #' Create and Lock DAG Object
 #'
-#' Check current DAG (created with \code{node}) for errors and consistency of its node distributions, set the observed data generating distribution. Attempts to simulates several observations to catch any errors in DAG definition. New nodes cannot be added after function set.DAG has been applied.
-#' @param DAG Named list of node objects that together will form a DAG. Temporal ordering of nodes is either determined by the order in which the nodes were added to the DAG (using \code{+node(...)} interface) or with an optional "order" argument to \code{node()}.
+#' Check current DAG (created with \code{node}) for errors and consistency of its node distributions, set the observed data generating distribution. 
+#' Attempts to simulates several observations to catch any errors in DAG definition. New nodes cannot be added after function set.DAG has been applied.
+#' @param DAG Named list of node objects that together will form a DAG. 
+#' Temporal ordering of nodes is either determined by the order in which the nodes were added to the DAG (using \code{+node(...)} interface) 
+#' or with an optional "order" argument to \code{node()}.
 #' @param vecfun A character vector with names of the vectorized user-defined node formula functions. See examples and the vignette for more information.
-#' @param verbose Set to \code{TRUE} to print messages on status and information to the console. 
-#'  Turn this off by default using options(simcausal.verbose=FALSE).
+#' @param latent.v The names of the unobserved (latent) DAG node names. These variables will be hidden from the observed simulated data and will be marked differently on the DAG plot.
+#' @param n.test Non-negative simulation sample size used for testing the consistency of the \code{DAG} object.
+#' A larger \code{n.test} may be useful when simulating a network of a fixed size (see \code{?network}) or when testing \code{DAG} for rare-event errors.
+#' A smaller \code{n.test} can be better for performance (faster validation of the \code{DAG}).
+#' Set \code{n.test=0} to completely skip the simulation test (use at your own risk, since calling \code{sim()} on such un-tested \code{DAG} may lead to uninterpretable errors).
+#' Note that when using \code{n.test=0}, the \code{plotDAG} function \emph{will not} draw \emph{any} child-parent relationships, since the formula parsing is not performed.
+#' @param verbose Set to \code{TRUE} to print messages on status and information to the console. Turn this off by default using options(simcausal.verbose=FALSE).
 #' @return A DAG (S3) object, which is a list consisting of node object(s) sorted by their temporal order.
-#' @example tests/RUnit/set.DAG.R
+#' @example tests/examples/set.DAG.R
 #' @export
-set.DAG <- function(DAG, vecfun, verbose = getOption("simcausal.verbose")) {
-
-  # ************
-  # Adding parent env. for future evaluation of node formulas.
-  # Will be saved as a DAG attribute and then passed to form parser for evaluation as: eval(form, envir = df, enclos = env)
+set.DAG <- function(DAG, vecfun, latent.v, n.test = 10, verbose = getOption("simcausal.verbose")) {
+  assertthat::assert_that(assertthat::is.count(n.test) || as.integer(n.test)==0L)
+  # Parent environment is saved as a DAG attribute and then passed to formula parser for evaluation as: eval(form, envir = df, enclos = env)
   user.env <- parent.frame()
-  # ************
-
   rndseed <- NULL
   # set of allowed named arguments:
-  node_args_all <- c("name", "t", "distr", "dist_params", "EFU", "order", "node.env")
+  node_args_all <- c("name", "mv.names", "t", "distr", "dist_params", "EFU", "order", "node.env")
   # set of required named arguments:
   node_args_req <- c("name", "distr", "order")
   # set of optional named arguments:
-  node_args_opt <- c("t", "dist_params", "EFU", "node.env")
+  node_args_opt <- c("t", "mv.names", "dist_params", "EFU", "node.env")
 
   #---------------------------------------------------------------------------------
   # DAG specification errors checks
   #---------------------------------------------------------------------------------
-
   # *) check DAG is a list and all of its items are also lists
   if (!(is.list(DAG))) stop("DAG must be a list")
   # *) if DAG is a empty create a wanring and return empty DAG
@@ -464,6 +513,7 @@ set.DAG <- function(DAG, vecfun, verbose = getOption("simcausal.verbose")) {
 
   if (!(all(sapply(DAG, is.list)))) stop("each of DAG items must be a list specifying DAG node(s)")
   class(DAG) <- "DAG"
+  
   # *) check all DAG have order attribute defined, if not, assign the order based on the node location in the list
   check.order <- sapply(Nattr(DAG, "order"), is.null)
   # print("check.order"); print(check.order)
@@ -481,7 +531,7 @@ set.DAG <- function(DAG, vecfun, verbose = getOption("simcausal.verbose")) {
   # *) check each node contains required named arguments
   checknames.req <- unlist(lapply(DAG, function(node) {
                               if ("DAG.node" %in% class(node)) {
-                                all(node_args_req%in%names(node))  
+                                all(node_args_req%in%names(node))
                               } else {
                                 TRUE
                               }
@@ -526,15 +576,28 @@ set.DAG <- function(DAG, vecfun, verbose = getOption("simcausal.verbose")) {
   # Adding the user calling environment for evaluation of node formulas
   #---------------------------------------------------------------------------------
   attr(inputDAG, "user.env") <- user.env
-
   #---------------------------------------------------------------------------------
-  # Checking for correct DAG specification by simulating one observation
+  # Adding the names of the latent.v (hidden) nodes
   #---------------------------------------------------------------------------------
-  obs.df <- try(simobs(inputDAG, n = 10, rndseed = rndseed))
-  if(inherits(obs.df, "try-error")) {
-    stop("\n...attempt to simulate data from DAG failed...")
+  if (!missing(latent.v)) attr(inputDAG, "latent.v") <- latent.v
+  #---------------------------------------------------------------------------------
+  # Adding the simulation test sample size (n.test), to be used on actions
+  #---------------------------------------------------------------------------------
+  attr(inputDAG, "n.test") <- n.test
+  #---------------------------------------------------------------------------------
+  # Checking for correct DAG specification by simulating n.test observation if n.test>0
+  #---------------------------------------------------------------------------------
+  if (n.test > 0L) {
+    obs.df <- try(simobs(inputDAG, n = n.test, rndseed = rndseed))
+    if(inherits(obs.df, "try-error")) {
+      stop("\n...attempt to simulate data from DAG failed...")
+    }
+    attr(inputDAG, "parents") <- attr(obs.df, "parents")
+  } else {
+    parents <- lapply(seq(inputDAG), function(x) vector(mode="character", length=0))
+    names(parents) <- names(inputDAG)
+    attr(inputDAG, "parents") <- parents
   }
-  attr(inputDAG, "parents") <- attr(obs.df, "parents")
   attr(inputDAG, "locked") <- TRUE
   return(inputDAG)
 }
@@ -590,17 +653,23 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
 	if (!is.DAG(inputDAG)) stop("inputDAG argument is not of class DAG, run set.DAG function first")
 
 	modDAG.full <- inputDAG # This is either observed data DAG (locked) or already existing DAG.action
+  n.test <- attr(inputDAG, "n.test") # the testing sample size used in original DAG
+  latent.v <- attr(inputDAG, "latent.v") # check that not intervening on latent nodes
   dagattrs_saved <- attributes(inputDAG) # save existing attributes
   dagattrs_saved$parents <- NULL  # remove all parents
   dagattrs_saved$actions <- NULL  # and actions
-
   class(actnodes) <- "DAG.nodelist"
   mod_names <- unlist(Nattr(actnodes, "name")) # get intervention node names
   DAG_names <- unlist(Nattr(inputDAG, "name"))  # get DAG node names
-
 	checkintnames <- mod_names %in% DAG_names
-	if (!all(checkintnames)) stop(paste0("setActions(): some intervention node names do not exist in the original DAG: ", paste0(mod_names[!checkintnames], collapse=",")))
-	DAG_chgnodes <- match(mod_names, DAG_names)	# nodes indices in DAG that need to be modified
+	if (!all(checkintnames)) stop(paste0("setActions(): some intervention node(s) do not exist in the original DAG: ", paste0(mod_names[!checkintnames], collapse=",")))
+	if (!is.null(latent.v)) {
+    if (any(mod_names %in% latent.v)) {
+      stop(paste0("setActions(): cannot intervene on latent node(s): "%+%paste0(mod_names[mod_names %in% latent.v], collapse=",")))
+    }
+  }
+
+  DAG_chgnodes <- match(mod_names, DAG_names)	# nodes indices in DAG that need to be modified
 	if (length(DAG_chgnodes)!=length(mod_names)) stop("setActions(): action node and DAG node names do not make a unique pair match")
 	for (inode in (1:length(mod_names))) {	# MODIFY DAG NODES w/ action nodes
 		modDAG.full <- modDAGnode(modDAG.full, actnodes[[inode]]) # launch a function for each pair (DAG_node <-> Intervention Node) that modifies DAG_node
@@ -625,7 +694,6 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
       gattr_nm <- attnames[i] # generic attribute name (without t)
 
 			attr_nodes <- expandattr(attnames[i], attr[[attnames[i]]], mod_tvals)
-			# mod_names_attr <- sapply(attr_nodes, function(node) node$name)
       mod_names_attr <- unlist(Nattr(attr_nodes, "name"))
   
 			checkattrexist <- (mod_names_attr%in%DAG_names)
@@ -640,7 +708,7 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
         # warning("\nNon-time-varying attribute ("%+% gattr_nm %+% ") was overwritten by time-varying attribute values")
       }
       # for generic node being added (theta), need to check that no TV nodes under the same name already exist (theta_i)
-      if (!checkgenexist) { # the generic (nonTV) node doesn't exist yet but the TV node already does
+      if (!checkgenexist) { # the generic (nonTV) node doesn`t exist yet but the TV node already does
         if ((length(attr_nodes)==1) && (mod_names_attr==gattr_nm) && any(gennamesall%in%gattr_nm)) { # check its a non-TV attribute that is being added:
           # give warning and delete old node, add new ones
           gnode_idx <- which(gennamesall%in%gattr_nm)
@@ -675,13 +743,14 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
   dprint("attributes(modDAG.full) in setAction(): "); dprint(attributes(modDAG.full))
 
   # check data can be simulated from modified DAG:
-  full.df <- try(simobs(modDAG.full, n=10, rndseed=rndseed))
-  if(inherits(full.df, "try-error")) {
-    stop("\n...attempt to simulate data from action DAG failed...")
+  if (n.test > 0) {
+    full.df <- try(simobs(modDAG.full, n=n.test, rndseed=rndseed))
+    if(inherits(full.df, "try-error")) {
+      stop("\n...attempt to simulate data from action DAG failed...")
+    }
+    attr(modDAG.full, "parents") <- attr(full.df, "parents")
   }
-
   # attributes(modDAG.full) <- c(attributes(modDAG.full)["names"], dagattrs_saved)
-	attr(modDAG.full, "parents") <- attr(full.df, "parents")
   attr(modDAG.full, "actname") <- actname
 	attr(modDAG.full, "actnodes") <- unique(c(attr(modDAG.full, "actnodes"), mod_names))
 	attr(modDAG.full, "acttimes") <- unique(c(attr(modDAG.full, "acttimes"), mod_tvals))
@@ -698,7 +767,7 @@ setAction <- function(actname, inputDAG, actnodes, attr=list()) {
 # node_args_all - all node arguments
 createNodeObj <- function(input.node, node_args_all) {
   indx_missargs <- which(!(node_args_all %in% names(input.node)))
-  temp <- list()	# temp list with NULL args that weren't defined yet
+  temp <- list()	# temp list with NULL args that weren`t defined yet
   length(temp) <- length(indx_missargs)
   names(temp) <- node_args_all[indx_missargs]
   input.node <- c(input.node, temp)	# add NULL named items to action node
@@ -713,8 +782,10 @@ createNodeObj <- function(input.node, node_args_all) {
 sortbyorder <- function(DAG) {
   node_names_L <- names(DAG)
   node_names_attr <- sapply(DAG, '[[', "name")
-  if (length(node_names_L)!=length(node_names_attr)) stop("DAG list names of node objects and node name arguments do not match in length...")
-  if (!all(node_names_L==node_names_attr)) stop("DAG list names of node objects and node name arguments don't match")
+
+  # if (length(node_names_L)!=length(node_names_attr)) stop("DAG list names of node objects and node name arguments do not match in length...")
+  # if (!all(node_names_L==node_names_attr)) stop("DAG list names of node objects and node name arguments don't match")
+
   order_vals <- sapply(DAG, '[[', "order")
   if ((length(order_vals)!=length(DAG)) | any(is.null(order_vals))) stop("node order argument is either incorrectly specified or missing")
   if (length(unique(order_vals))!=length(order_vals)) stop("some nodes have identical order values - all order values must be unique")

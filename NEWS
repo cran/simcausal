@@ -34,7 +34,7 @@ simcausal 0.3.0
 * Adding conversion utility function to/from sparse adjacency network matrix to simcausal internet network storage;
 * Switching from warning to message when replacing/modifying existing DAG node object;
 
-simcausal 0.3.0
+simcausal 0.4.0
 ==============
 
 * New CRAN version release.
@@ -46,3 +46,26 @@ simcausal 0.3.0
 * Fixing an issue with NetIndClass not calling self$make.nF() when outside network matrix is assigned;
 
 * Making nF (vector of the number of friends across observations) available as a special variable that can be used inside node expressions (as distributional parameters);
+
+simcausal 0.5.0
+==============
+
+* Major changes since last version 0.4.0.
+
+* Added support for time-varying nodes over network: can index friend nodes with syntactic sugar expressions like Node[[F_indx]], even when this Node is a time-varying random variable. For such nodes, start by using the syntactic indexing by t, i.e., Node[t], then add friend indexing with expressions like Node[t][[F_indx]]. See the forthcoming vignette on networks for examples.
+
+* Added support for latent variables, set.DAG has a new argument v.latent, any node names specified to this argument will be hidden from the simulated data. This allows one to explicitly define errors (U’s) for each node. This will be also plotted differently by plotDAG.
+
+* set.DAG has a new argument n.test, used for changing the default sample size of the simulation test performed by set.DAG (default n.test=100). Set n.test=0 to skip the DAG object test completely.
+
+* Node argument EFU can be a logical expression (any function of previously defined node names), which must evaluate to TRUE/FALSE. Right-censoring for a specific observation then occurs only if: 1) The node value evaluated to 1 & 2) EFU evaluates to TRUE
+
+* Added support for multivariate nodes, such as multivariate normal, copulas, etc. See a separate section on multivariate distributions in ?node.
+
+* A specially reserved variable name "Nsamp" can be used in any node expression, always evaluates to the currently simulated sample size (a column of constant values). Works similarly to the network-specific reserved variables "Kmax" and "nF" (see ?network).
+
+* Changed the format of plotDAG output. The internal (endogenous) nodes are no longer surrounded by circles. All latent nodes are surrounded by circles, all children of latent nodes are shown with dashed arrow.
+
+* Switched internal storage of simulated data to data.table. The output is always a data.frame.
+
+

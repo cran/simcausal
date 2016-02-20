@@ -35,7 +35,7 @@ add.nodes <- function(DAG, nodes) {
     checkexist <- (node_nm%in%DAG_names) # check if the node under the same name already exists
     checkexistgen <- (gnode_nm%in%DAG_names) # check if the generic node under the same name already exists
 
-    if ((!checkexist) & checkexistgen) { # the TV node doesn't exist yet but the generic (nonTV) already does
+    if ((!checkexist) & checkexistgen) { # the TV node doesn`t exist yet but the generic (nonTV) already does
     # give warning and delete old node, add new ones
       gnode_idx <- which(DAG_names%in%gnode_nm)
       modDAG <- modDAG[-gnode_idx]
@@ -43,7 +43,7 @@ add.nodes <- function(DAG, nodes) {
       warning("existing non-time-varying node "%+% gnode_nm %+% " was overwritten with a time-varying node")
     }
 
-    if (!checkexist) {  # this node doesn't exist yet in the DAG, new node has to be added
+    if (!checkexist) {  # this node doesn`t exist yet in the DAG, new node has to be added
       node_insert <- nodes[node_idx]
       t_insert <- nodes[[node_idx]]$t
       t_idx_all <- Nattr(modDAG, "t") # a list of t values from current DAG (including NULLs)
@@ -103,7 +103,7 @@ add.nodes <- function(DAG, nodes) {
 #' @param ... Additional named attributes defining / indexing the action
 #' @param attr Additional named attributes defining / indexing the action
 #' @return A modified \code{DAG} object with the added action
-#' @example tests/RUnit/add.action.R
+#' @example tests/examples/add.action.R
 #' @export
 add.action <- function(DAG, name, nodes, ..., attr=list()) {
   if (!is.DAG(DAG)) {
@@ -187,7 +187,7 @@ DAG.empty <- function() {
     # class(res) <- "DAG"
     res <- add.nodes(DAG = obj1, nodes = obj2)
   } else if ("DAG.netlist" %in% class(obj2)) {
-    if (!is.null(attr(obj1, "DAG.net"))) message("overwriting previously defined network object")
+    # if (!is.null(attr(obj1, "DAG.net"))) message("overwriting previously defined network object")
     res <- add.nodes(DAG = obj1, nodes = obj2)
     attr(res, "DAG.net") <- obj2
   } else {

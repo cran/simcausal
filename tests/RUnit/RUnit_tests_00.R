@@ -18,13 +18,23 @@ if(FALSE) {
   # CHECK AND BUILD PACKAGE:
   getwd()
   # setwd("./simcausal"); setwd(".."); getwd()
-  devtools::check(args = c("--no-vignettes"), build_args = c("--no-build-vignettes")) # runs check with devtools
-  # devtools::build_win(args = "--compact-vignettes") # build package on CRAN servers (windows os?)
+  devtools::check() # runs full check
+  devtools::check(args = c("--no-vignettes"), build_args = c("--no-build-vignettes")) # runs faster
+  devtools::build_win(args = "--compact-vignettes") # build package on CRAN servers (windows os?)
   devtools::build(args = "--compact-vignettes") # build package tarball compacting vignettes
   # devtools::build(args = "--no-build-vignettes") # build package tarball compacting vignettes
   # devtools::build() # build package tarball
+  
+  # check reverse dependencies:
+  devtools::revdep(dependencies = c("Depends", "Imports", "Suggests", "LinkingTo"),
+                    recursive = FALSE, ignore = NULL)
+  res <- devtools::revdep_check()
+  devtools::revdep_check_summary(res)
+  # revdep_check_save_logs(res)
+
   setwd("..")
-  system("R CMD check --as-cran simcausal_0.4.0.tar.gz") # check R package tar ball prior to CRAN submission
+  
+  system("R CMD check --as-cran simcausal_0.5.0.tar.gz") # check R package tar ball prior to CRAN submission
       ## system("R CMD check --no-manual --no-vignettes simcausal") # check without building the pdf manual and not building vignettes
       ## system("R CMD build simcausal --no-build-vignettes")
       ## system("R CMD build simcausal")  
@@ -56,47 +66,119 @@ if(FALSE) {
 psi_RDs_DAG2a <- NULL
 psi_RDs_DAG2b <- NULL
 
-sample_checks <- function() {   # doesn't run, this is just to show what test functions can be used
+sample_checks <- function() {   # doesnt run, this is just to show what test functions can be used
   print("Starting tests...")
-    checkTrue(1 < 2, "check1")     ## passes fine
-     ## checkTrue(1 > 2, "check2")  ## appears as failure in the test protocol
-     v <- 1:3
-     w <- 1:3
-     checkEquals(v, w)               ## passes fine
-     names(v) <- c("A", "B", "C")
-     ## checkEquals(v, w)            ## fails because v and w have different names
-     checkEqualsNumeric(v, w)        ## passes fine because names are ignored
-     x <- rep(1:12, 2)
-     y <- rep(0:1, 12)
-     res <- list(a=1:3, b=letters, LM=lm(y ~ x))
-     res2 <- list(a=seq(1,3,by=1), b=letters, LM=lm(y ~ x))
-     checkEquals( res, res2)        ## passes fine
-     checkIdentical( res, res)
-     checkIdentical( res2, res2)
-     ## checkIdentical( res, res2)  ## fails because element 'a' differs in type
-     fun <- function(x) {
-       if(x)
-       {
-        stop("stop conditions signaled")
-       }
-       return()
-     }
-     checkException(fun(TRUE))      ## passes fine
-     ## checkException(fun(FALSE))  ## failure, because fun raises no error
-     checkException(fun(TRUE), silent=TRUE)
-     ##  special constants
-     ##  same behaviour as for underlying base functions
-     checkEquals(NA, NA)
-     checkEquals(NaN, NaN)
-     checkEquals(Inf, Inf)
-     checkIdentical(NA, NA)
-     checkIdentical(NaN, NaN)
-     checkIdentical(-Inf, -Inf)
+  checkTrue(1 < 2, "check1")     ## passes fine
+  ## checkTrue(1 > 2, "check2")  ## appears as failure in the test protocol
+  v <- 1:3
+  w <- 1:3
+  checkEquals(v, w)               ## passes fine
+  names(v) <- c("A", "B", "C")
+  ## checkEquals(v, w)            ## fails because v and w have different names
+  checkEqualsNumeric(v, w)        ## passes fine because names are ignored
+  x <- rep(1:12, 2)
+  y <- rep(0:1, 12)
+  res <- list(a=1:3, b=letters, LM=lm(y ~ x))
+  res2 <- list(a=seq(1,3,by=1), b=letters, LM=lm(y ~ x))
+  checkEquals( res, res2)        ## passes fine
+  checkIdentical( res, res)
+  checkIdentical( res2, res2)
+  ## checkIdentical( res, res2)  ## fails because element 'a' differs in type
+  fun <- function(x) {
+   if(x)
+   {
+    stop("stop conditions signaled")
+   }
+   return()
+  }
+  checkException(fun(TRUE))      ## passes fine
+  ## checkException(fun(FALSE))  ## failure, because fun raises no error
+  checkException(fun(TRUE), silent=TRUE)
+  ##  special constants
+  ##  same behaviour as for underlying base functions
+  checkEquals(NA, NA)
+  checkEquals(NaN, NaN)
+  checkEquals(Inf, Inf)
+  checkIdentical(NA, NA)
+  checkIdentical(NaN, NaN)
+  checkIdentical(-Inf, -Inf)
 }
 
 `%+%` <- function(a, b) paste0(a, b)
 as.numeric.factor <- function(x) {as.numeric(levels(x))[x]}
 allNA = function(x) all(is.na(x))
+
+
+# test that all new nodes added after time-var nodes have a t argument:
+test.t.error <- function() {
+  D <- DAG.empty()
+  D <- D + node("timevar", t=0:5, distr="rconst", const = 1)
+  checkException(D <- D + node("nottimevar", distr="rconst", const = 5))
+}
+
+# testing n.test arg to set.DAG(), including when n.test=0L
+test.Nsamp.n.test <- function() {
+  # testing categorical for no errors and no warnings with empty returns (n=0)
+  checkEquals(length(rcategor.int(n=0, probs = c(0.3,0.3,0.4))),0)
+  checkEquals(length(rcategor(n=0, probs = c(0.3,0.3,0.4))),0)
+  checkEquals(length(rcategor.int(n=0, probs = matrix(data=c(0.3,0.3,0.4), nrow=5,ncol=3))),0)
+  checkEquals(length(rcategor(n=0, probs = matrix(data=c(0.3,0.3,0.4), nrow=5,ncol=3))),0)
+
+  D <- DAG.empty()
+  D <- D + node("A", distr = "rbern", prob=0.5) + 
+    node("N", distr = "rconst", const=Nsamp)
+  Dset <- set.DAG(D)
+  dat1 <- sim(Dset, n = 100)
+
+  Dset.ntest <- set.DAG(D, n.test = 200)
+
+  # simulate empty dataset:
+  empty.dat1 <- sim(Dset, n = 0)
+
+  Dset.0obs <- set.DAG(D, n.test = 0L)
+}
+
+
+# Adding test for latent vars
+test.latent <- function() {
+  D <- DAG.empty()
+  D <- D +
+  node("I", distr = "rcategor.int",
+    probs = c(0.1, 0.2, 0.2, 0.2, 0.1, 0.1, 0.1)) +
+  node("W1", distr = "rnorm",
+    mean = ifelse(I == 1, 0, ifelse(I == 2, 3, 10)) + 0.6 * I, sd = 1) +
+  node("W2", distr = "runif",
+    min = 0.025*I, max = 0.7*I) +
+  node("W3", distr = "rbern",
+    prob = plogis(-0.5 + 0.7*W1 + 0.3*W2 - 0.2*I)) +
+  node("A", distr = "rbern",
+    prob = plogis(+4.2 - 0.5*W1 + 0.2*W2/2 + 0.2*W3)) +
+  node("U.Y", distr = "rnorm", mean = 0, sd = 1) +
+  node("Y", distr = "rconst",
+    const = -0.5 + 1.2*A + 0.1*W1 + 0.3*W2 + 0.2*W3 + 0.2*I + U.Y)
+  Dset1 <- set.DAG(D, latent.v = c("I", "U.Y"))
+  plotDAG(Dset1)
+
+  # testing n.test=0 data sim for empty returns:
+  Dset1.n0 <- set.DAG(D, latent.v = c("I", "U.Y"), n.test=0)
+  plotDAG(Dset1.n0)
+
+  # testing data sim for empty returns:
+  Odatsim.empty <- simobs(Dset1, n = 0, rndseed = 1)
+  checkEquals(nrow(Odatsim.empty),0)
+
+  # testing data sim with 1 obs:
+  Odatsim.1obs <- simobs(Dset1, n = 1, rndseed = 1)
+  checkEquals(nrow(Odatsim.1obs),1)
+
+  Odatsim <- simobs(Dset1, n = 200, rndseed = 1)  
+
+  Dset1 <- Dset1 + action("A1", nodes = node("A", distr = "rbern", prob = 1))
+  Fdatsim <- sim(DAG = Dset1, actions = c("A1"), n = 200, rndseed = 123)
+  checkException(
+    Dset1 <- Dset1 + action("A1.latent", nodes = node("I", distr = "rbern", prob = 1))
+  )
+}
 
 # Adding test for custom distr funs and an error message for non-existing distribution functions:
 test.noexistdistr <- function() {
@@ -134,13 +216,37 @@ test.noexistdistr <- function() {
   D <- DAG.empty()
   D <- D + node("W1", distr = "rbern", prob = 0.5)
   Dset <- set.DAG(D)
-  sim(Dset, n = 20)
+  dat <- sim(Dset, n = 20)
 }
+
+# ADDING FUNCTIONALITY THAT ALLOWS EFU ARG TO BE ANY LOGICAL R EXPRESSION (allows for conditional right-censoring)
+test.EFUeval <- function(){
+  Drm <- DAG.empty()
+  Drm <- Drm +
+    node("C.time", t = 0:5, distr = "rbern", prob = if(t==0) {0.2} else {ifelse(C.time[t-1]==1,1,0.2)}) + # value 1 indicates that censoring time has arrived
+    node("Y", t = 0:5, distr = "rbern", prob = 0.3, EFU = ifelse(C.time[t]==1,TRUE,FALSE)) + # outcome that becomes a censoring var only after C.time[t]=1
+    node("D", t = 0:5, distr = "rbern", prob = 0.2, EFU = TRUE) # another outcome that is always a censoring variable
+  D <- set.DAG(Drm)
+  dat <- sim(D, n=100)
+
+  # testing n.test=0 sim for empty returns:
+  D.n0 <- set.DAG(Drm, n.test=0)
+  plotDAG(D.n0)
+
+  # testing data sim for empty returns:
+  Odatsim.empty <- simobs(D, n = 0, rndseed = 1)
+  checkEquals(nrow(Odatsim.empty),0)
+  checkIdentical(names(dat), names(Odatsim.empty))
+  
+  # testing data sim with 1 obs:
+  Odatsim.1obs <- simobs(D, n = 1, rndseed = 1)
+  checkEquals(nrow(Odatsim.1obs),1)
+}
+
 
 # DAG2 (from tech specs): defining actions with a new constructor and passing attributes
 test.set.DAG_DAG2b_newactions <- function() {
     library(simcausal)
-
     #-------------------------------------------------------------
     # EXAMPLE 1: lets start with a simple example of a (W,A,Y) DAG
     #-------------------------------------------------------------
@@ -153,6 +259,7 @@ test.set.DAG_DAG2b_newactions <- function() {
             node("A",  distr = "rbern", prob = plogis(-0.5 - 0.3*W1 - 0.3*W2 - 0.2*W3)) + 
             node("Y",  distr = "rbern", prob = plogis(-0.1 + rconst + 1.2*A + 0.3*W1 + 0.3*W2 + 0.2*W3), EFU=TRUE)
     D_WAY <- set.DAG(D)
+    D_WAY_0obs <- set.DAG(D, n.test=0)
 
 
     # Allowing user.env vectors to be used in node formulas and be indexed by t:
@@ -170,10 +277,11 @@ test.set.DAG_DAG2b_newactions <- function() {
             # Error in rconst[0L] : undefined time-dependent variable(s): rconst_0
             # node("Y",  t=0:1, distr = "rbern", prob = plogis(-0.1 + rconst[t] + 1.2*A[0] + 0.3*W1[0] + 0.3*W2[0] + 0.2*W3[0]), EFU=TRUE)
     D_WAY <- set.DAG(D)
-    sim(D_WAY, n=50)
+    D_WAY_0obs <- set.DAG(D, n.test=0)
+    datn50 <- sim(D_WAY, n=50)
 
     #-------------------------------------------------------------
-    # EXAMPLE 1: lets start with a simple example of a (W,A,Y) DAG
+    # EXAMPLE 1: simple example of a (W,A,Y) DAG
     #-------------------------------------------------------------
     # new interface:
     D <- DAG.empty()
@@ -183,6 +291,7 @@ test.set.DAG_DAG2b_newactions <- function() {
             node("A",  distr = "rbern", prob = plogis(-0.5 - 0.3*W1 - 0.3*W2 - 0.2*W3), order = 4) + 
             node("Y",  distr = "rbern", prob = plogis(-0.1 + 1.2*A + 0.3*W1 + 0.3*W2 + 0.2*W3), order = 5, EFU = TRUE)
     D_WAY <- set.DAG(D)
+    D_WAY_0obs <- set.DAG(D, n.test=0)
 
     #-------------------------------------------------------------
     # Plot this DAG
@@ -192,8 +301,8 @@ test.set.DAG_DAG2b_newactions <- function() {
     # simulate observed data data from this DAG
     O_dat_WAY <- simobs(D_WAY, n=500, rndseed = 123)
     O_dat_WAY_sim <- sim(D_WAY, n=500, rndseed = 123)
-    head(O_dat_WAY, 10)
-    head(O_dat_WAY_sim, 10)
+    head(O_dat_WAY, 2)
+    head(O_dat_WAY_sim, 2)
     all.equal(O_dat_WAY, O_dat_WAY_sim)
 
     #-------------------------------------------------------------
@@ -202,10 +311,12 @@ test.set.DAG_DAG2b_newactions <- function() {
     # lets define an action setting treatment to 1
     A1 <- node("A",distr="rbern", prob=1)
     D_WAY <- D_WAY + action("A1", nodes=A1)
+    D_WAY_0obs <- D_WAY_0obs + action("A1", nodes=A1)
 
     # lets define another action setting treatment to 0
     A0 <- node("A",distr="rbern", prob=0)
     D_WAY <- D_WAY + action("A0", nodes=A0)
+    D_WAY_0obs <- D_WAY_0obs + action("A0", nodes=A0)
 
     # selecting actions - its just an intervened DAG
     class(A(D_WAY))
@@ -217,37 +328,44 @@ test.set.DAG_DAG2b_newactions <- function() {
     #-------------------------------------------------------------
     # Simulate full data for all available actions (A(D))
     X_dat1 <- simfull(A(D_WAY), n=500, rndseed = 123)
-    head(X_dat1[[1]]); head(X_dat1[[2]])
+    head(X_dat1[[1]], 2); head(X_dat1[[2]], 2)
+
+    X_dat1_0obs <- simfull(A(D_WAY), n=0, rndseed = 123)
+    X_dat1_0obs
 
     X_dat1_sim1 <- sim(DAG=D_WAY, actions=c("A1","A0"), n=500, rndseed = 123)
     X_dat1_sim2 <- sim(DAG=D_WAY, actions=A(D_WAY), n=500, rndseed = 123)
-    head(X_dat1_sim1[[1]]); head(X_dat1_sim1[[2]])
-    head(X_dat1_sim2[[1]]); head(X_dat1_sim2[[2]])
+    head(X_dat1_sim1[[1]],2); head(X_dat1_sim1[[2]],2)
+    head(X_dat1_sim2[[1]],2); head(X_dat1_sim2[[2]],2)
 
     # Simulate full data for some actions
     X_datA1 <- simfull(A(D_WAY)["A1"], n=500, rndseed = 123)
     X_datA1_sim <- sim(DAG=D_WAY, actions="A1", n=500, rndseed = 123)
     checkIdentical(X_datA1, X_datA1_sim)
 
-    head(X_datA1[[1]]); 
+    head(X_datA1[[1]],2); 
 
     #-------------------------------------------------------------
     # Calculating the target parameter: counterfactual expectations
     #-------------------------------------------------------------
     # Counterfactual mean survival at time-point
     D_WAY <- set.targetE(D_WAY, outcome="Y", param="A1")
-    eval.target(D_WAY, data=X_dat1)     # using previously simulated full data
-    eval.target(D_WAY, n=500, rndseed = 123)  # simulate full data first then evaluate param
+    res <- eval.target(D_WAY, data=X_dat1)     # using previously simulated full data
+    
+    # fail when full data was sampled with n=0:
+    checkException(eval.target(D_WAY, data=X_dat1_0obs))
+
+    res <- eval.target(D_WAY, n=500, rndseed = 123)  # simulate full data first then evaluate param
 
     # Contrasts
     D_WAY <- set.targetE(D_WAY, outcome="Y", param="A1-A0")
-    eval.target(D_WAY, data=X_dat1)
-    eval.target(D_WAY, n=500, rndseed = 123)
+    res <- eval.target(D_WAY, data=X_dat1)
+    res <- eval.target(D_WAY, n=500, rndseed = 123)
 
     # Ratios
     D_WAY <- set.targetE(D_WAY, outcome="Y", param="A1/A0")
-    eval.target(D_WAY, data=X_dat1)
-    eval.target(D_WAY, n=500, rndseed = 123)
+    res <- eval.target(D_WAY, data=X_dat1)
+    res <- eval.target(D_WAY, n=500, rndseed = 123)
 
     #-------------------------------------------------------------
     # categorical node tests 1, 2 & 3
@@ -299,10 +417,15 @@ test.set.DAG_DAG2b_newactions <- function() {
     D_cat_3 <- D_unif + node("Y", distr="rcategor", probs={0.2; 0.1; 0.5}, order=5)
 
     D_unif <- set.DAG(D_unif)
+    D_unif_0obs <- set.DAG(D_unif, n.test=0)
     D_cat_1 <- set.DAG(D_cat_1)
+    D_cat_1_0obs <- set.DAG(D_cat_1, n.test=0)
     D_cat_2 <- set.DAG(D_cat_2)
+    D_cat_2_0obs <- set.DAG(D_cat_2, n.test=0)
     D_cat_3 <- set.DAG(D_cat_3)
- 
+    D_cat_3_0obs <- set.DAG(D_cat_3, n.test=0)
+
+
     A1 <- node("Anode",distr="rbern", prob=1)
     D_cat_1 <- D_cat_1 + action("A1", nodes=A1)
     # lets define another action setting treatment to 0
@@ -350,6 +473,16 @@ test.set.DAG_DAG2b_newactions <- function() {
             node( "Y",  t=1:t_end, distr="rbern", prob=plogis(-6.5 + L1[0] + 4*L2[t] + 0.05*sum(I(L2[0:t]==rep(0,(t+1))))), order=9+4*(0:(t_end-1)), EFU=TRUE)
     lDAG2b <- set.DAG(D)
 
+    lDAG2b_0obs <- set.DAG(D, n.test = 0)
+    
+    # testing data sim for empty returns. Can't evalute this one, since the error has to do with the way rowSums is called
+    checkException(Odatsim.empty <- sim(lDAG2b, n = 0, rndseed = 1))
+    # checkEquals(nrow(Odatsim.empty),0)
+    # checkIdentical(names(dat), names(Odatsim.empty))
+  
+    # testing data sim with 1 obs:
+    Odatsim.1obs <- sim(lDAG2b, n = 1, rndseed = 1)
+    checkEquals(nrow(Odatsim.1obs),1)
     #-------------------------------------------------------------
     # Plot the observed DAG
     #-------------------------------------------------------------
@@ -402,12 +535,26 @@ test.set.DAG_DAG2b_newactions <- function() {
     # Simulating data (observed and counterfactual (full))
     #-------------------------------------------------------------
     # Simulate observed data
-    O_dat <- simobs(D, n=500, rndseed = 123)
-    # O_dat <- simobs(D, n=10000, rndseed = 123)
-    # head(O_dat)
-    O_dat_long <- simobs(D, n=500, wide=FALSE, rndseed = 123) # observed long format:
-    # O_dat_long <- simobs(D, n=10000, wide=FALSE, rndseed = 123) # observed long format:
-    # head(O_dat_long, 50)
+    t1 <- system.time(O_dat <- simobs(D, n=500, rndseed = 123))
+    print(t1)
+    # for 50K
+    #  user  system elapsed 
+    # 2.740   0.521   3.250
+
+    t1.long <- system.time({
+      O_dat <- simobs(D, n = 500, rndseed = 123)
+      dat.long1 <- DF.to.long(O_dat)
+    })
+    print(t1.long)
+    # for 50K
+    #  user  system elapsed
+    # 8.932   1.058   9.954
+
+    t2.long <- system.time(O_dat_long <- simobs(D, n=500, wide=FALSE, rndseed = 123)) # observed long format:)
+    print(t2.long)
+    # for 50K:
+    #  user  system elapsed
+    # 3.606   0.798   4.397
 
     # Simulate full data for given actions (A(D))
     X_dat <- simfull(A(D), n=500, rndseed = 123)
@@ -854,8 +1001,8 @@ test.condrcategor <- function() {
   dat2 <- simcausal:::simFromDAG(DAG = Dset2, Nsamp = 100, rndseed = 1234)
   all.equal(dat1a, dat2)
 
-  node_evaluator <- simcausal:::Define_sVar$new(netind_cl = NULL)
-  node_evaluator$set.user.env(attr(Dset2, "user.env"))
+  node_evaluator <- simcausal:::Define_sVar$new() # netind_cl = NULL
+  # node_evaluator$set.user.env(attr(Dset2, "user.env"))
   eval_expr_res <- node_evaluator$eval.nodeforms(cur.node = Dset2[["Cat3"]], data.df = dat2[,c("ID","W")])
   eval_expr_res[[1]]$par.nodes
   catprobs <- eval_expr_res[[1]]$evaled_expr
@@ -2204,10 +2351,12 @@ test.set.DAG_general <- function() {
 }
 
 # manually defining the distribution node
-fmakeBern <- function(name, order, meanform, EFU=NULL, logit=TRUE) {
+fmakeBern <- function(name, order, meanform, EFU=NULL, logit=TRUE, t = NULL) {
     meanform <- as.character(meanform)
     if (logit) meanform <-  paste0("plogis(", meanform, ")")
-    return(list(name = name, distr = "rbern", dist_params = list(prob = meanform), EFU = EFU, order = order, node.env = environment()))
+    # node()
+    return(node(name = name, distr = "rbern", order = order, params = list(prob = meanform), EFU = .(EFU)))
+    # return(list(name = name, distr = "rbern", dist_params = list(prob = meanform), EFU = EFU, order = order, node.env = environment()))
 }
 
 test.set.DAG_DAG1 <- function() {
@@ -2218,13 +2367,13 @@ test.set.DAG_DAG1 <- function() {
     n <- 500
     # n <- 100000
     n <- n  # faster run time
-
     W1 <- fmakeBern("W1", 1, -0.5)
     W2 <- fmakeBern("W2", 2, "-0.5 + 0.5*W1")
     W3 <- fmakeBern("W3", 3, "-0.5 + 0.7*W1 + 0.3*W2")
     A <- fmakeBern("A", 4, "-0.5 - 0.3*W1 - 0.3*W2 - 0.2*W3")
     Y <- fmakeBern("Y", 5, "-0.1 + 1.2*A + 0.3*W1 + 0.3*W2 + 0.2*W3", TRUE)
-    testDAG_1 <- list(W1 = W1, W2 = W2, W3 = W3, A = A, Y = Y)
+    # testDAG_1 <- list(W1 = W1, W2 = W2, W3 = W3, A = A, Y = Y)
+    testDAG_1 <- c(W1, W2, W3, A, Y)
     datgendist_DAG1 <- set.DAG(testDAG_1)
     simODAG_1 <- simobs(datgendist_DAG1, n = n, rndseed = 123)
     # attributes(datgendist_DAG1)
@@ -2238,15 +2387,16 @@ test.set.DAG_DAG1 <- function() {
     # testing one intervention (named nested list with each item = one intervention)
     # newactions1 <-  list(AW2set1 = list(W2=list(name="W2", distr="rbern", prob=1), 
     #                                         A=list(name="A", distr="rbern", prob=1)))
-    newaction1 <-  list(W2=list(name="W2", distr="rbern", dist_params=list(prob=1)), A=list(name="A", distr="rbern", dist_params=list(prob=1)))
+    newaction1 <-  c(node("W2", distr="rbern", prob=1), node("A", distr="rbern", prob=1))
+
 
     # returns a named list of DAGs, where each item = one counterfactual DAG
 
     action1_DAG_1 <- list(simcausal:::setAction(actname="action1_DAG_1", inputDAG=datgendist_DAG1, actnodes=newaction1))
     checkTrue(class(action1_DAG_1)%in%"list")
     checkTrue(length(action1_DAG_1)==1)
-    checkEquals(action1_DAG_1[[1]]$W2$dist_params$prob,1)
-    checkEquals(action1_DAG_1[[1]]$A$dist_params$prob,1)
+    checkEquals(action1_DAG_1[[1]]$W2$dist_params$prob,"1")
+    checkEquals(action1_DAG_1[[1]]$A$dist_params$prob,"1")
 
     fulldf_ac1 <- simfull(action1_DAG_1, n=n, rndseed = 123)
     # nrow(fulldf_ac1[[1]])
@@ -2261,8 +2411,8 @@ test.set.DAG_DAG1 <- function() {
     # DAG 1 - action 2: simcausal:::setAction & simfull
     #--------------------------------------------------------
     # testing two interventions - each intervention results in a separate DAG
-    newaction1 <-  list(W2=list(name="W2", distr="rbern", dist_params=list(prob=1)), A=list(name="A", distr="rbern", dist_params=list(prob=1)))
-    newaction2 <-  list(A=list(name="A", distr="rbern", dist_params=list(prob=0)))
+    newaction1 <-  c(node("W2", distr="rbern", prob=1), node("A", distr="rbern", prob=1))
+    newaction2 <-  node(name="A", distr="rbern", prob=0)
     # returns a named list of DAGs, where each item = one counterfactual DAG
     action1_DAG_1 <- list(simcausal:::setAction(actname="AW2set1", inputDAG=datgendist_DAG1, actnodes=newaction1))
     action2_DAG_1 <- list(simcausal:::setAction(actname="Aset0", inputDAG=datgendist_DAG1, actnodes=newaction2))
@@ -2272,9 +2422,9 @@ test.set.DAG_DAG1 <- function() {
 
     checkTrue(class(actions_DAG_1)=="list")
     checkTrue(length(actions_DAG_1)==2)
-    checkEquals(actions_DAG_1[[1]]$W2$dist_params$prob,1)
-    checkEquals(actions_DAG_1[[1]]$A$dist_params$prob,1)
-    checkEquals(actions_DAG_1[[2]]$A$dist_params$prob,0)
+    checkEquals(actions_DAG_1[[1]]$W2$dist_params$prob,"1")
+    checkEquals(actions_DAG_1[[1]]$A$dist_params$prob,"1")
+    checkEquals(actions_DAG_1[[2]]$A$dist_params$prob,"0")
 
     fulldf_ac2 <- simfull(actions_DAG_1, n=n, rndseed = 123)
     checkTrue(class(fulldf_ac2)=="list")
@@ -2366,7 +2516,6 @@ test.set.DAG_DAG2_errors <- function() {
     # test for no underscore char "_" in node names
     checkException(node("A_2", distr="rbern", prob=0.5, order=1))
 
-    #
     # RETURNS AN ERROR (AS IT SHOULD) - FIXED TO CORRECTLY THROW AN EXCEPTION: VAR L2[0] NOT DEFINED
     L2_0 <- node(name="L1", t=0, distr="rbern", prob=0.05, order=1)
     L1_0 <- node(name="L2", t=0, distr="rbern", prob=ifelse(L2[0]==1,0.5,0.1), order=2)
@@ -2378,14 +2527,11 @@ test.set.DAG_DAG2_errors <- function() {
     # long DAG 2: set.DAG - catching a node naming error
     #--------------------------------------------------------
     n <- 500
-    # n <- 1000000
-    n <- n  # faster run time
-
-    L1_0 <- fmakeBern("L1_0", 1, 0.05, NULL, FALSE)
-    L2_0 <- fmakeBern("L2_0", 2, "ifelse(L1_0==1,0.5,0.1)", NULL, FALSE)
-    A1_0 <- fmakeBern("A1_0", 3, "ifelse(all(c(L1_0,L2_0)==c(1,0)), 0.5, ifelse(all(c(L1_0,L2_0)==c(0,0)) , 0.1, ifelse(all(c(L1_0,L2_0)==c(1,1)) , 0.9, 0.5)))", NULL, FALSE)
-    A2_0 <- fmakeBern("A1_0", 4, "0", NULL, FALSE)
-    Y_0 <- fmakeBern("Y_0", 5, "0", TRUE, FALSE)
+    L1_0 <- fmakeBern("L1", 1, 0.05, NULL, FALSE, t=0)
+    L2_0 <- fmakeBern("L2", 2, "ifelse(L1_0==1,0.5,0.1)", NULL, FALSE, t=0)
+    A1_0 <- fmakeBern("A1", 3, "ifelse(all(c(L1_0,L2_0)==c(1,0)), 0.5, ifelse(all(c(L1_0,L2_0)==c(0,0)) , 0.1, ifelse(all(c(L1_0,L2_0)==c(1,1)) , 0.9, 0.5)))", NULL, FALSE, t=0)
+    A2_0 <- fmakeBern("A1", 4, "0", NULL, FALSE, t=0)
+    Y_0 <- fmakeBern("Y", 5, "0", TRUE, FALSE, t=0)
     
     #*********************************************
     # GIVES AN ERROR AS IT SHOULD, SINCE THE NODE NAMES OF THE OBJECT AND LIST DON'T MATCH (A1_0!=A2_0)

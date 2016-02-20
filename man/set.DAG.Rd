@@ -4,21 +4,32 @@
 \alias{set.DAG}
 \title{Create and Lock DAG Object}
 \usage{
-set.DAG(DAG, vecfun, verbose = getOption("simcausal.verbose"))
+set.DAG(DAG, vecfun, latent.v, n.test = 10,
+  verbose = getOption("simcausal.verbose"))
 }
 \arguments{
-\item{DAG}{Named list of node objects that together will form a DAG. Temporal ordering of nodes is either determined by the order in which the nodes were added to the DAG (using \code{+node(...)} interface) or with an optional "order" argument to \code{node()}.}
+\item{DAG}{Named list of node objects that together will form a DAG.
+Temporal ordering of nodes is either determined by the order in which the nodes were added to the DAG (using \code{+node(...)} interface)
+or with an optional "order" argument to \code{node()}.}
 
 \item{vecfun}{A character vector with names of the vectorized user-defined node formula functions. See examples and the vignette for more information.}
 
-\item{verbose}{Set to \code{TRUE} to print messages on status and information to the console.
-Turn this off by default using options(simcausal.verbose=FALSE).}
+\item{latent.v}{The names of the unobserved (latent) DAG node names. These variables will be hidden from the observed simulated data and will be marked differently on the DAG plot.}
+
+\item{n.test}{Non-negative simulation sample size used for testing the consistency of the \code{DAG} object.
+A larger \code{n.test} may be useful when simulating a network of a fixed size (see \code{?network}) or when testing \code{DAG} for rare-event errors.
+A smaller \code{n.test} can be better for performance (faster validation of the \code{DAG}).
+Set \code{n.test=0} to completely skip the simulation test (use at your own risk, since calling \code{sim()} on such un-tested \code{DAG} may lead to uninterpretable errors).
+Note that when using \code{n.test=0}, the \code{plotDAG} function \emph{will not} draw \emph{any} child-parent relationships, since the formula parsing is not performed.}
+
+\item{verbose}{Set to \code{TRUE} to print messages on status and information to the console. Turn this off by default using options(simcausal.verbose=FALSE).}
 }
 \value{
 A DAG (S3) object, which is a list consisting of node object(s) sorted by their temporal order.
 }
 \description{
-Check current DAG (created with \code{node}) for errors and consistency of its node distributions, set the observed data generating distribution. Attempts to simulates several observations to catch any errors in DAG definition. New nodes cannot be added after function set.DAG has been applied.
+Check current DAG (created with \code{node}) for errors and consistency of its node distributions, set the observed data generating distribution.
+Attempts to simulates several observations to catch any errors in DAG definition. New nodes cannot be added after function set.DAG has been applied.
 }
 \examples{
 #---------------------------------------------------------------------------------------
@@ -148,11 +159,96 @@ customfun <- function(arg, lambda) {
   res
 }
 D <- DAG.empty()
-D <- D + 
-node("W1", distr = "rbern", prob = 0.05) + 
-node("W2", distr = "rbern", prob = customfun(W1, 0.5)) + 
+D <- D +
+node("W1", distr = "rbern", prob = 0.05) +
+node("W2", distr = "rbern", prob = customfun(W1, 0.5)) +
 node("W3", distr = "rbern", prob = ifelse(W1 == 1, 0.5, 0.1))
 D1d <- set.DAG(D, vecfun = c("customfun"))
 sim1d <- simobs(D1d, n = 200, rndseed = 1)
+
+
+#---------------------------------------------------------------------------------------
+# EXAMPLE 6: Defining latent variables I and U.Y (will be hidden from simulated data)
+#---------------------------------------------------------------------------------------
+D <- DAG.empty()
+D <- D +
+  node("I",
+    distr = "rcategor.int",
+    probs = c(0.1, 0.2, 0.2, 0.2, 0.1, 0.1, 0.1)) +
+  node("W1",
+    distr = "rnorm",
+    mean = ifelse(I == 1, 0, ifelse(I == 2, 3, 10)) + 0.6 * I,
+    sd = 1) +
+  node("W2",
+    distr = "runif",
+    min = 0.025*I, max = 0.7*I) +
+  node("W3",
+    distr = "rbern",
+    prob = plogis(-0.5 + 0.7*W1 + 0.3*W2 - 0.2*I)) +
+  node("A",
+    distr = "rbern",
+    prob = plogis(+4.2 - 0.5*W1 + 0.2*W2/2 + 0.2*W3)) +
+	node("U.Y", distr = "rnorm", mean = 0, sd = 1) +
+  node("Y",
+    distr = "rconst",
+    const = -0.5 + 1.2*A + 0.1*W1 + 0.3*W2 + 0.2*W3 + 0.2*I + U.Y)
+Dset1 <- set.DAG(D, latent.v = c("I", "U.Y"))
+simobs(Dset1, n = 200, rndseed = 1)
+
+#---------------------------------------------------------------------------------------
+# EXAMPLE 7: Multivariate random variables
+#---------------------------------------------------------------------------------------
+require("mvtnorm")
+D <- DAG.empty()
+
+# 3 dimensional normal (uncorrelated), using rmvnorm function from rmvnorm package:
+D <- D +
+  node(c("X1","X2","X3"), distr = "rmvnorm", mean = c(0,1,2))
+
+# Bivariate normal (correlation coef 0.75):
+D <- D +
+  node(c("Y1","Y2"), distr = "rmvnorm",
+    mean = c(0,1),
+    sigma = matrix(c(1,0.75,0.75,1), ncol=2))
+
+# Can use any component of such multivariate nodes when defining future nodes:
+D <- D + node("A", distr = "rconst", const = 1 - X1)
+Dset1 <- set.DAG(D, verbose = TRUE)
+dat1 <- sim(Dset1, n = 200)
+
+# Bivariate uniform copula using copula package (correlation coef 0.75):
+require("copula")
+D <- DAG.empty()
+D <- D +
+  node(c("Y1","Y2"), distr = "rCopula",
+    copula = normalCopula(0.75, dim = 2))
+Dset2 <- set.DAG(D)
+dat2 <- sim(Dset2, n = 200)
+
+# Bivariate binomial from previous copula, with same correlation:
+vecfun.add("qbinom")
+D <- D + node("A.Bin1", distr = "rconst", const = qbinom(Y1, 10, 0.5))
+D <- D + node("A.Bin2", distr = "rconst", const = qbinom(Y2, 15, 0.7))
+Dset3 <- set.DAG(D)
+dat3 <- sim(Dset3, n = 200)
+
+# Same as "A.Bin1" and "A.Bin2", but directly using rmvbin function in bindata package:
+require("bindata")
+D <- DAG.empty()
+D <- D +
+  node(c("B.Bin1","B.Bin2"), distr = "rmvbin",
+    margprob = c(0.5, 0.5),
+    bincorr = matrix(c(1,0.75,0.75,1), ncol=2))
+Dset4 <- set.DAG(D)
+dat4 <- sim(Dset4, n = 200)
+
+# Time-varying multivar node (3 time-points, 2 dimensional normal):
+D <- DAG.empty()
+D <- D +
+  node(c("X1", "X2"), t = 0:2, distr = "rmvnorm",
+    mean = c(0,1),
+    sigma = matrix(rep(0.75,4), ncol=2))
+Dset5 <- set.DAG(D)
+dat5 <- sim(Dset5, n = 200)
 }
 

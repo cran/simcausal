@@ -61,8 +61,6 @@ is.integerish <- function (x) is.integer(x) || (is.numeric(x) && all(x == as.int
 #' Similarly, use \code{mean(VarName[[net_indx]])} to define a summary measure as a mean of \code{VarName} values of friends in \code{F_i[net_indx]}, across all \code{i}.
 #' For more details on defining such summary functions see the \code{simcausal} vignette.
 #'
-#' @param name Character name for the network, to be used in future versions
-#' @param Kmax Either an R expression that evaluates to an integer constant or an integer specifying the maximum number of friends (connections) any simulated observation can have.
 #' @param netfun Character name of the user-defined network generating function, can be any R function that returns a matrix of friend IDs of dimension \code{c(n, Kmax)}. 
 #' The function must accept a named argument \code{n} that specifies the total sample size of the network.
 #' The matrix of network IDs should have \code{n} rows and \code{Kmax} columns, where each row \code{i} contains a vector of unique IDs in \code{1:n} that are \code{i}'s friends
@@ -70,16 +68,19 @@ is.integerish <- function (x) is.integer(x) || (is.numeric(x) && all(x == as.int
 #' Arguments to \code{netfun} can be either passed as named arguments to \code{network} function itself or as a named list of parameters \code{params}.
 #' These network arguments can themselves be functions of the previously defined node names,
 #' allowing for network sampling itself to be dependent on the previously simulated node values, as shown in Example 2.
+#' @param name Character string specifiying the name of the current network, may be used for adding new network that replaces the existing one (resample previous network)
+# @param Kmax Either an R expression that evaluates to an integer constant or an integer specifying the maximum number of friends (connections) any simulated observation can have.
 #' @param ... Named arguments specifying distribution parameters that are accepted by the network sampling function in \code{netfun}. 
 #' These parameters can be R expressions that are themselves formulas of the past node names.
 #' @param params A list of additional named parameters to be passed on to the \code{netfun} function. 
 #' The parameters have to be either constants or character strings of R expressions of the past node names.
 #' @return A list containing the network object(s) of type \code{DAG.net}, this will be utilized when data is simulated with \code{sim} function.
-#' @example tests/RUnit/example.simnets.R
+#' @example tests/examples/example.simnets.R
 # @family network functions
 #' @seealso \code{\link{igraph.to.sparseAdjMat}}; \code{\link{sparseAdjMat.to.NetInd}}; \code{\link{NetInd.to.sparseAdjMat}}; \code{\link{sparseAdjMat.to.igraph}}
 #' @export
-network <- function(name, Kmax, netfun, ..., params = list()) {
+network <- function(name, netfun, ..., params = list()) {
+# network <- function(name, netfun, Kmax, ..., params = list()) {  
   env <- parent.frame()
   if (missing(netfun)) stop("netfun argument must be specified")
   # collect all distribution parameters with delayed evaluation (must be named)
@@ -93,9 +94,13 @@ network <- function(name, Kmax, netfun, ..., params = list()) {
     stop("please specify name for each attribute")
   }
 
-  if (missing(Kmax)) stop("Kmax argument must be specified")
-  assert_that(is.count(Kmax))
-  dist_params$Kmax <- Kmax
+  if (missing(name)) stop("Network name must be specified")
+  # name <- "net.node."%+%sample(c(10000:20000), 1)
+  # name <- "net.node."%+%netfun
+
+  # if (missing(Kmax)) stop("Kmax argument must be specified")
+  # assert_that(is.count(Kmax))
+  # dist_params$Kmax <- Kmax
 
   # check the distribution function exists, if not found also check the calling environment:
   if (!exists(netfun)) {
@@ -105,7 +110,8 @@ network <- function(name, Kmax, netfun, ..., params = list()) {
     }
   }
 
-  net_dist_params <- list(name = name, Kmax = Kmax, netfun = netfun, dist_params = dist_params, node.env = env)
+  net_dist_params <- list(name = name, netfun = netfun, dist_params = dist_params, node.env = env)
+  # net_dist_params <- list(name = name, netfun = netfun, Kmax = Kmax, dist_params = dist_params, node.env = env)
   net_lists <- list(net_dist_params)
   names(net_lists) <- name
 
@@ -137,6 +143,9 @@ igraph.to.sparseAdjMat <- function(igraph_network) {
 #' @param sparseAdjMat Network represented as a sparse adjacency matrix (S4 class object \code{dgCMatrix} from package \code{Matrix}).
 #' NOTE: The friends (row numbers) of observation \code{i} are assumed to be listed in column \code{i}
 #' (i.e, \code{which(sparseAdjMat[,i])} are friends of \code{i}).
+#' @param trimKmax Trim the maximum number of friends to this integer value. If this argument is not missing, 
+#'  the conversion network matrix obtained from \code{sparseAdjMat} will be trimmed, so that each observation has at most \code{trimKmax} friends.
+#'  The trimming initiates from the last column of the network ID matrix, removing columns until only \code{trimKmax} columns are left.
 #' @return A named list with 3 items: 1) \code{NetInd_k}; 2) \code{nF}; and 3) \code{Kmax}.
 #' 1) \code{NetInd_k} - matrix of network IDs of dimension \code{(n=nrow(sparseAdjMat),Kmax)}, where each row \code{i} consists of the network IDs (friends) for observation \code{i}. 
 #' Remainders are filled with NAs.
@@ -146,7 +155,7 @@ igraph.to.sparseAdjMat <- function(igraph_network) {
 # @family network functions
 #' @seealso \code{\link{network}}; \code{\link{NetInd.to.sparseAdjMat}}; \code{\link{sparseAdjMat.to.igraph}}; \code{\link{igraph.to.sparseAdjMat}};
 #' @export
-sparseAdjMat.to.NetInd <- function(sparseAdjMat) {
+sparseAdjMat.to.NetInd <- function(sparseAdjMat, trimKmax) {
   assertthat::assert_that(is(sparseAdjMat, "sparseMatrix"))
   # sparseAdjMat:
     # i: These are the 0-based row numbers for each non-zero element in the matrix.
@@ -161,7 +170,7 @@ sparseAdjMat.to.NetInd <- function(sparseAdjMat) {
   cumFindx <- sparseAdjMat@p
   # 3) All non-zero elements as a vector of 0-based row numbers:
   base0_IDrownums <- sparseAdjMat@i
-  # 4) Figure out the dim of the result mat NetInd_k and initiate:
+  # 4) Figure out the dims of the result mat NetInd_k and initiate:
   Kmax <- max(nF)
   NetInd_k <- matrix(NA_integer_, nrow = length(nF), ncol = Kmax)
   # 5) For each non-zero elements in nF, populate NetInd_k with friend IDs:
@@ -174,6 +183,17 @@ sparseAdjMat.to.NetInd <- function(sparseAdjMat) {
   # Check the total n of non-zero elements is the same as in original sparseAdjMat:
   nnonzero <- sum(!is.na(NetInd_k))
   stopifnot(nnonzero==sparseAdjMat@p[ncol(sparseAdjMat)+1])
+  # If trimKmax provided, trim the max number of friends to the value in trimKmax:
+  if (!missing(trimKmax)) {
+    assert_that(is.integerish(trimKmax))
+    trimKmax <- as.integer(trimKmax)
+    # trim only is the actual number of friends in > trimKmax:
+    if (Kmax > trimKmax) {
+      NetInd_k <- NetInd_k[, 1L:trimKmax] # trim the network ID mat
+      nF <- as.integer(.rowSums(!is.na(NetInd_k), m = nrow(NetInd_k), n = ncol(NetInd_k))) # recalculate nF
+      Kmax <- max(nF) # assign new value to Kmax
+    }
+  }
   return(list(NetInd_k = NetInd_k, nF = nF, Kmax = Kmax))
 }
 
@@ -211,7 +231,6 @@ NetInd.to.sparseAdjMat <- function(NetInd_k, nF) {
 #' @param mode Character scalar, passed on to \code{igraph::graph_from_adjacency_matrix}, specifies how igraph should interpret the supplied matrix. 
 #' See \code{?igraph::graph_from_adjacency_matrix} for details.
 #' @return A list containing the network object(s) of type \code{DAG.net}.
-# @family network functions
 #' @seealso \code{\link{network}}; \code{\link{igraph.to.sparseAdjMat}}; \code{\link{sparseAdjMat.to.NetInd}}; \code{\link{NetInd.to.sparseAdjMat}};
 #' @export
 sparseAdjMat.to.igraph <- function(sparseAdjMat, mode = "directed") {
@@ -226,8 +245,8 @@ sparseAdjMat.to.igraph <- function(sparseAdjMat, mode = "directed") {
 # for fidx = 0 (var itself), ..., kmax. fidx can be a vector, in which case a 
 # character vector of network names is returned. If varnm is also a vector, a 
 # character vector for all possible combinations of (varnm x fidx) is returned.
-#-----------------------------------------------------------------------------
 # OUTPUT format: Varnm_net.j:
+#-----------------------------------------------------------------------------
 netvar <- function(varnm, fidx) {
   cstr <- function(varnm, fidx) {
     slen <- length(fidx)
@@ -345,6 +364,7 @@ NetIndClass <- R6Class("NetIndClass",
         assert_that(ncol(NetInd_k) == self$Kmax)
         self$NetInd_k[, ] <- NetInd_k
         self$make.nF()
+        invisible(self)
       }
     },
 

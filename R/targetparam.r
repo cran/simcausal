@@ -349,7 +349,7 @@ set.targetE <- function(DAG, outcome, t, param, ...,  attr=list()) {
 #'D <- set.targetMSM(D, outcome="Y", t=0:5, formula=msm.form, family="binomial", 
 #'hazard=FALSE)
 #'MSMres <- eval.target(D, n=1000)
-#'MSMres$beta
+#'MSMres$coef
 #'
 #'#---------------------------------------------------------------------------------------
 #'# MSM EXAMPLE 2: Modeling survival over time with exposure-based summary measures
@@ -362,7 +362,7 @@ set.targetE <- function(DAG, outcome, t, param, ...,  attr=list()) {
 #'D <- set.targetMSM(D, outcome="Y", t=0:5, formula=msm.form_sum, family="binomial",
 #'hazard=FALSE)
 #'MSMres <- eval.target(D, n=1000)
-#'MSMres$beta
+#'MSMres$coef
 #'
 #' @export
 # function to set MSM as the target, saves target obj in DAG until evaluation
@@ -507,7 +507,7 @@ eval.target <- function(DAG, n, data, actions, rndseed = NULL, verbose = getOpti
   } else {
     stop("target parameter can be either E (expectation) or working MSM, other parameters are not implemented")
   }
-  attr(DAG, "target")$res <- res 	# save each node's parent set as an attribute of output data.frame
+  attr(DAG, "target")$res <- res 	# save each node`s parent set as an attribute of output data.frame
   res
 }
 
@@ -580,7 +580,7 @@ eval.MSM <- function(DAG, df_full, outnodes, outnode_nms, params.MSM, attrs, ver
   #*******************************
   if (!is.longfmt(df_full[[1]])) {
     parse_form <- parse.MSMform(msm.form = form, t_vec = t_vec, old.DAG = DAG)
-    MSMtermsDAG <- parse_form$MSMtermsDAG	# DAG that defines the exposure summaries that need to be eval'ed
+    MSMtermsDAG <- parse_form$MSMtermsDAG	# DAG that defines the exposure summaries that need to be eval`ed
     term_maptab <- parse_form$term_maptab
 
     act_names <- names(df_full)
@@ -608,7 +608,7 @@ eval.MSM <- function(DAG, df_full, outnodes, outnode_nms, params.MSM, attrs, ver
                         })
     }
     # SuppressGivenWarnings(df_full <- lapply(df_full, DF.to.longDT), GetWarningsToSuppress())
-    df_full <- lapply(df_full, DF.to.longDT)
+    df_full <- lapply(df_full, DF.to.longDT, return_DF = FALSE)
     names(df_full) <- act_names
     # * Subset all data.frame variables by t once its in long format
     if(!is.null(t_vec)) df_full <- lapply(df_full, subset_dat_long, t_vec) #this should include the indicators

@@ -29,11 +29,12 @@ CopyAttributes <- function(attrslist, dataform=NULL, tvals=NULL, LTCF=NULL) {
       )
 }
 
-get_allts <- function(obs.df) { # calculate actual time values used in the simulated data (wide format)
+get_allts <- function(obs.df) { # calculate actual t values used in the simulated data (wide format)
   node_nms <- attributes(obs.df)$names[-1]
   all_ts <- as.integer(unique(sapply(strsplit(node_nms, "_"), '[', 2)))
   all_ts <- sort(all_ts[!is.na(all_ts)]) #remove NA/NULL cases and sort
 }
+
 get_gennames <- function(obs.df) { # grab generic names (without time points) from simulated data (wide format)
   node_nms <- attributes(obs.df)$names[-1]
   gennames <- as.character(unique(sapply(strsplit(node_nms, "_"), '[', 1)))
@@ -64,6 +65,7 @@ getactions <- function(DAG, actions) {
 # Internal function for simulation data from any DAG
 # If prev.data is not NULL all the nodes in DAG will be evaluated in the environment of prev.data alone
 simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, prev.data = NULL, verbose = getOption("simcausal.verbose")) {
+  assertthat::assert_that(assertthat::is.count(Nsamp) || as.integer(Nsamp)==0L)
   if (!is.null(rndseed)) {
     set.seed(rndseed)
   }
@@ -73,6 +75,9 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
   sampleNodeDistr <- function(newNodeParams, distr, EFUP.prev, cur.node, expr_str, asis.samp = FALSE) {
     N_notNA_samp <- sum(!EFUP.prev)
     user.env <- cur.node$node.env
+    asis.flags <- attr(newNodeParams$dist_params, "asis.flags")
+    # print("asis.flags: "); print(asis.flags)
+    # if (all(asis.flags)) asis.samp <- TRUE
 
     standardize_param <- function(distparam) {
       check_len <- function(param) {
@@ -86,6 +91,10 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         }
         param
       }
+
+      # print("distparam: "); print(distparam)
+      # print("class(distparam): "); print(class(distparam))
+
       if (class(distparam)%in%"list") {
         distparam <- lapply(distparam, check_len)
         distparam <- do.call("cbind", distparam)
@@ -122,7 +131,12 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     # *) Go over distribution parameters and for each parameter:
     # check for consistency; make it an appropriate length; turn each list parameter into matrix;
     dprint("before standardize newNodeParams$dist_params:"); dprint(newNodeParams$dist_params)
-    if (!asis.samp) newNodeParams$dist_params <- lapply(newNodeParams$dist_params, standardize_param)
+    if (!asis.samp) {
+      for (idx in seq_along(newNodeParams$dist_params)) {
+        # newNodeParams$dist_params <- lapply(newNodeParams$dist_params, standardize_param)
+        if (!asis.flags[[idx]]) newNodeParams$dist_params[[idx]] <- standardize_param(newNodeParams$dist_params[[idx]])
+      }
+    }
     dprint("after standardize newNodeParams$dist_params:"); dprint(newNodeParams$dist_params)
 
     # *) Add n argument to dist_params
@@ -132,12 +146,13 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     newVar_Samp <- try(do.call(distr.fun, newNodeParams$dist_params))
 
     if(inherits(newVar_Samp, "try-error")) {
-      stop("simulating from distribution " %+% distr %+% "() has failed")
+      stop("failed while sampling node '" %+% cur.node$name %+% "', from distribution '" %+% distr %+% "'")
     }
 
     if (asis.samp) {
       return(newVar_Samp)
-    } else {
+    # output is a vector
+    } else if (is.null(dim(newVar_Samp))||is.vector(newVar_Samp)) {
       newVar <- rep.int(NA, Nsamp)
       if (is.factor(newVar_Samp)) {
         newVar[!EFUP.prev] <- as.numeric(levels(newVar_Samp))[newVar_Samp]
@@ -146,6 +161,13 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         newVar[!EFUP.prev] <- newVar_Samp
       }
       return(newVar)
+    # output is a matrix -> test dimensionality is correct (equal length(names)), but do nothing else
+    } else if (is.matrix(newVar_Samp)) {
+      if (ncol(newVar_Samp)!=length(cur.node$mv.names)) stop("dimensionality (number of columns) sampled by multivariate node is not equal to length of `name` argument for node: " %+% cur.node$name)
+      colnames(newVar_Samp) <- cur.node$mv.names
+      return(newVar_Samp)
+    } else {
+      stop("unrecognized sampled variable output type, only vectors or matrices are allowed, node: " %+% cur.node$name)
     }
   }
 
@@ -154,7 +176,11 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
   #---------------------------------------------------------------------------------
   EFUP.prev <- rep(FALSE, Nsamp)
   LTCF.prev <- rep(FALSE, Nsamp)
-  obs.df <- data.frame(ID = seq(1:Nsamp))
+
+  obs.df <- data.frame(ID = seq(vector(length = Nsamp))) # obs.df <- data.frame(ID = seq(1:Nsamp))
+  obs.dt <- data.table(obs.df)
+
+  alloc.col(obs.dt, max(min(length(DAG)+1, 1000), 200)) # need to allocate columns in DT to maximum number of variables
 
   #---------------------------------------------------------------------------------
   # CHECKS PERFORMED DURING EVALUTION:
@@ -168,57 +194,52 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
   # consider pre-allocating memory for newNodeParams and newVar
   #---------------------------------------------------------------------------------
   newVar <- vector(length = Nsamp)
-  NodeParentsNms <- vector("list", length = length(DAG))	# list that will  have parents' names for each node
-  names(NodeParentsNms) <- sapply(DAG, '[[', "name")
-  netind_cl <- NULL
-  node_evaluator <- Define_sVar$new(netind_cl = netind_cl)
+  NvarsPerNode <- sapply(DAG, function(node) length(node[["mv.names"]]))
+  totalNvars <- sum(NvarsPerNode)
+  MVvars <- unlist(lapply(DAG, function(node) node[["mv.names"]]))
+  MVvarMapNode <- NULL
+  for (node in DAG) {
+    for (mv.name in node[["mv.names"]]) MVvarMapNode <- append(MVvarMapNode, list(list(MVname = mv.name, Node = node$name)))
+  }
+  names(MVvarMapNode) <- MVvars
+
+  NodeParentsNms <- vector("list", length = length(DAG))	# list that will have parents names for each node
+  names(NodeParentsNms) <- names(DAG)
+  
+  # initialize the node formula evaluator class (Define_sVar):
+  node_evaluator <- Define_sVar$new() # netind_cl = netind_cl
   t_pts <- NULL
+  netind_cl <- NULL
+
   for (cur.node in DAG) {
     t <- cur.node$t # define variable for a current time point t
     t_new <- !(t %in% t_pts) # set to TRUE when switch to new time point t occurs otherwise FALSE
     t_pts <- c(t_pts, t)
     t_pts <- as.integer(unique(t_pts)) # vector that keeps track of unique timepoints t
     gnodename <- as.character(unlist(strsplit(cur.node$name, "_"))[1])
-    # dprint("current t: "%+%t%+%"; t new: "%+%t_new); dprint("current time points: ");  dprint(t_pts);
-    # dprint("obs.df"); dprint(head(obs.df))
-    # dprint("is null t_pts"); dprint(is.null(t_pts)); dprint(is.null(t))
-
-    # 12/23/2014 OS: Decided to turned off imputation (carry-forward) for summary measure data (when prev.data is provided)
-    # if (!is.null(t)) {	# check time points were specified by user
-    # 	# When simulating in the environment of prev.data as a base (for MSM summary measures)
-    # 	# need to check if the failure event has occurred at the previous timepoint when LTCF is not null
-    # 	if (!is.null(prev.data) & !is.null(LTCF) & (t > t_pts[1])) {
-    # 		LTCFname <- LTCF%+%"_"%+%(t-1)
-    # 		LTCF.prev <- (prev.data[,LTCFname]%in%1)
-    # 	}
-    # }
 
     #------------------------------------------------------------------------
     # CHECKS NODE DISTRIBUTIONS & EVALUATE NODE DISTRIBUTION PARAMS PROVIDED IN NODE FORMULA(S)
     #------------------------------------------------------------------------
     # TO DO:
-    # Need to make sure that action attributes never get separate columns in df, since there are just constants
+    # Need to make sure that action attributes never get separate columns in df, since they are just constants
     # The attributes should be added to the eval env as variables
     # See if current expr naming strucutre in Define_sVar can be recycled for sampling from multivariate densities
     # NEED TO ADDRESS: WHEN A CONSTANT (length==1) IS PASSED AS A PARAMETER, DON'T ALWAYS WANT TO TURN IT INTO A VECTOR OF LENGTH n
     #------------------------------------------------------------------------
     
     # setting the node-specific user calling environment for the evaluator:
-    node_evaluator$set.user.env(cur.node$node.env)
-
-    eval_expr_res <- node_evaluator$eval.nodeforms(cur.node = cur.node, data.df = if (!is.null(prev.data)) prev.data else obs.df)
+    # node_evaluator$set.user.env(cur.node$node.env)
+    eval_expr_res <- node_evaluator$eval.nodeforms(cur.node = cur.node, data.df = if (!is.null(prev.data)) prev.data else obs.dt)
     par.names <- unique(unlist(lapply(eval_expr_res, '[[', "par.nodes")))
     eval_dist_params <- lapply(eval_expr_res, '[[' ,"evaled_expr")
+    attr(eval_dist_params, "asis.flags") <- attr(cur.node$dist_params, "asis.flags")
     newNodeParams <- list(dist_params = eval_dist_params, par.names = par.names)
-    
-    dprint("cur.node t:" %+% cur.node$t)
-    dprint("original nodeform expr:"); dprint(lapply(cur.node$dist_params, function(expr) as.character(expr)))
-    dprint("full eval_expr_res:"); dprint(eval_expr_res)
-    dprint("eval_dist_params:"); dprint(eval_dist_params)
 
-    if (!is.null(newNodeParams$par.names)) {
-      NodeParentsNms[[cur.node$name]] <- newNodeParams$par.names
-    }
+    # dprint("cur.node t:" %+% cur.node$t)
+    # dprint("original nodeform expr:"); dprint(lapply(cur.node$dist_params, function(expr) as.character(expr)))
+    # dprint("full eval_expr_res:"); dprint(eval_expr_res)
+    # dprint("eval_dist_params:"); dprint(eval_dist_params)
 
     #------------------------------------------------------------------------
     # SAMPLE NEW COVARIATE BASED ON DISTR PARAMS
@@ -226,33 +247,41 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     distr <- cur.node$distr
     if ("DAG.net" %in% class(cur.node)) {
 
-      if (!is.null(netind_cl) && verbose) message("Previously sampled network is being sampled again during the same simulation!")
+      if (!is.null(netind_cl) && verbose) message("Network is being re-sampled during the same simulation!")
       distr <- cur.node$netfun
 
       # ***************************************************************
       # USING AS-IS FOR SAMPLING NETWORK BECAUSE THE OUTPUT IS A MATRIX. THIS IS A BAD WAY TO SOLVE THIS.
       # A BETTER SOLUTION IS TO ALLOW THE distr RESULT TO BE A VECTOR OR MATRIX (for multivariate RVs)
       # *****************************************************************
-      NetInd_k <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev, 
+      NetIndMat <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev, 
                                   cur.node = cur.node, expr_str = cur.node$dist_params, asis.samp = TRUE)
-      
-      Kmax.new <- ncol(NetInd_k)
-      if (as.integer(Kmax.new) != as.integer(cur.node$Kmax)) {
-        if (verbose) message("Kmax is reset to a new value; old Kmax: " %+% cur.node$Kmax %+% "; new Kmax: " %+% Kmax.new)
-        cur.node$Kmax <- Kmax.new
-      }
+      cur.node$Kmax <- ncol(NetIndMat)
       netind_cl <- NetIndClass$new(nobs = Nsamp, Kmax = cur.node$Kmax)
-      netind_cl$NetInd <- NetInd_k
-      netind_cl$make.nF()
+      netind_cl$NetInd <- NetIndMat
+      node_evaluator$set.net(netind_cl) # set the network for the evaluator:
 
-      # set the network for the evaluator:
-      node_evaluator$netind_cl <- netind_cl
-      node_evaluator$Kmax <- netind_cl$Kmax
-
+      # Kmax.new <- ncol(NetIndMat)
+      # if (as.integer(Kmax.new) != as.integer(cur.node$Kmax)) {
+      #   if (verbose) message("Kmax is reset to a new value; old Kmax: " %+% cur.node$Kmax %+% "; new Kmax: " %+% Kmax.new)
+      #   cur.node$Kmax <- Kmax.new
+      # }
+      # node_evaluator$Kmax <- netind_cl$Kmax
       newVar <- NULL
       NodeParentsNms <- NodeParentsNms[-which(names(NodeParentsNms) %in% cur.node$name)]
 
     } else {
+      # print("cur.node: "); print(cur.node$name)
+      # print("newNodeParams$par.names: "); print(newNodeParams$par.names)
+      # print("MVvarMapNode"); print(MVvarMapNode)
+      if (!is.null(newNodeParams$par.names)) {
+        for (idx in seq_along(newNodeParams$par.names)) {
+          choose_node_idx <- names(MVvarMapNode) %in% newNodeParams$par.names[idx]
+          if (sum(choose_node_idx)>0) newNodeParams$par.names[idx] <- MVvarMapNode[choose_node_idx][[1]][["Node"]]
+        }
+        NodeParentsNms[[cur.node$name]] <- c(NodeParentsNms[[cur.node$name]], newNodeParams$par.names)
+      }
+ 
       newVar <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev,
                                 cur.node = cur.node, expr_str = cur.node$dist_params)
     }
@@ -271,13 +300,15 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
           # Carry last observation forward for those who reached EFUP (failed or but not censored)
           prevtVarnm <- gnodename %+% "_" %+% (t-1)
           # Check first that the variable exists (has been defined at the previous time point), if it doesn't exist, just assign NA
-          if(!any(names(obs.df)%in%prevtVarnm)) {
+          # if(!any(names(obs.df)%in%prevtVarnm)) {
+          if(!any(names(obs.dt)%in%prevtVarnm)) {
             warning(gnodename%+%": is undefined at t="%+%(t-1)%+%", hence cannot be carried forward to t="%+%t)
             newVar[LTCF.prev] <- NA
           } else {
-            newVar[LTCF.prev] <- obs.df[LTCF.prev, (gnodename %+% "_" %+% (t-1))]
+            # newVar[LTCF.prev] <- obs.df[LTCF.prev, (gnodename %+% "_" %+% (t-1))]
+            # newVar[LTCF.prev] <- obs.dt[LTCF.prev, (gnodename %+% "_" %+% (t-1)), with = FALSE]
+            newVar[LTCF.prev] <- obs.dt[LTCF.prev, ][[(gnodename %+% "_" %+% (t-1))]]
           }
-          # dprint("obs.df"); dprint(names(obs.df)); dprint(gnodename%+%"_"%+%(t-1))
         }
         # carry forward the censoring indicator as well (after evaluating to censored=1) - disabled call doLTCF() with censoring node name instead
         # if ((!is.null(LTCF))) {
@@ -288,40 +319,89 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
       }
       #------------------------------------------------------------------------
       # modify the observed data by adding new sampled covariate
-      # *** TODO: need to allow result to be a matrix (for multivar distributions) ***
+      # *** TODO: need to internally save the evaluation results EFU.flag for the following lines to work correctly:
+        # in eval.target():
+        # vec_EFUP <- sapply(N(DAG)[outnode_nms], is.EFUP)
+        # in eval.MSM():
+        # vec_EFUP <- sapply(DAG[outnode_nms], is.EFUP)
+        # in doLTCF():
+        # if  (is.EFUP(cur.node)&(cur.outcome))
       #------------------------------------------------------------------------
-      obs.df <- within(obs.df, {assign(cur.node$name, newVar)})
-      if (is.EFUP(cur.node)) { # if cur.node is EFU=TRUE type set all observations that had value=1 to EFUP.prev[indx]=TRUE
-        EFUP.now <- (obs.df[,ncol(obs.df)]%in%1)
-        EFUP.prev <- (EFUP.prev | EFUP.now)
-        if ((!is.null(LTCF)) && (LTCF%in%gnodename) && is.null(prev.data)) { # is this node the one to be carried forward (LTCF node)? mark the observations with value = 1 (carry forward)
-          LTCF.prev <- (LTCF.prev | EFUP.now)
+    
+      # 2 ways to assign several new vars with data.table (1st is the fastest)
+      if (is.matrix(newVar)) {
+        for (col in cur.node$mv.names) {
+          obs.dt[, (col) := newVar[, col]]
+          # obs.df <- within(obs.df, {assign(col, newVar[, col])})
+        }
+      } else {
+        obs.dt[, (cur.node$name) := newVar]
+        # obs.df <- within(obs.df, {assign(cur.node$name, newVar)})
+      }
+      # another version, requires making a copy of newVar
+      # obs.dt[,(cur.node$name):=as.data.table(newVar)]
+
+      if (!is.null(cur.node$EFU)) {
+        # EFU is now evaluated separately for each observation, only when evaluates to TRUE then the current node starts acting as a censoring variable
+        # EFU.flag <- node_evaluator$eval.EFU(cur.node = cur.node, data.df = if (!is.null(prev.data)) prev.data else obs.df)
+        EFU.flag <- node_evaluator$eval.EFU(cur.node = cur.node, data.df = if (!is.null(prev.data)) prev.data else obs.dt)
+        EFU.TRUE <- EFU.flag %in% TRUE
+        # EFU.TRUE <- which(EFU.flag %in% TRUE)
+        # print("EFU.flag: "); print(EFU.flag); print(EFU.flag %in% TRUE)
+        # check for censoring only when at least one observation had EFU=TRUE
+        if (sum(EFU.TRUE)>0) {
+          # EFUP.now <- (obs.df[,ncol(obs.df)]%in%1) & (EFU.TRUE)
+          EFUP.now <- (obs.dt[[cur.node$name[1]]]%in%1) & (EFU.TRUE)
+          EFUP.prev <- (EFUP.prev | EFUP.now)
+          if ((!is.null(LTCF)) && (LTCF%in%gnodename) && is.null(prev.data)) { # is this node the one to be carried forward (LTCF node)? mark the observations with value = 1 (carry forward)
+            LTCF.prev <- (LTCF.prev | EFUP.now)
+          }
         }
       }
     }
   }
 
   # Collect all attributes to be assigned to the obs data
-  all_ts <- get_allts(obs.df) # calculate actual time values used in the simulated data
+  # all_ts <- get_allts(obs.df) # calculate actual time values used in the simulated data
+  all_ts <- get_allts(obs.dt) # calculate actual time values used in the simulated data
+
   if (sum(LTCF.prev)>0) {	# only change the LTCF attribute if outcome carry forward imputation was really carried out for at least one obs
     LTCF_flag <- LTCF
   } else {
     LTCF_flag <- NULL
   }
 
-  newattrs <- FormAttributes(DAG = DAG, parents = NodeParentsNms, dataform = "wide", LTCF = LTCF_flag, tvals = all_ts, netind_cl = netind_cl)
+  # -----------------------------------------------------------------------------------
+  # Remove latent variables from the simulated dataset (if any were declared as latent)
+  # -----------------------------------------------------------------------------------
+  latent.v <- attr(DAG, "latent.v")
+  if (!is.null(latent.v)) {
+    # excl.cols <- colnames(obs.df)%in%latent.v
+    excl.cols <- colnames(obs.dt)%in%latent.v
+    if (sum(excl.cols) > 0) {
+      # obs.df <- obs.df[,!excl.cols]
+      obs.dt[,(colnames(obs.dt)[excl.cols]):=NULL]
+    }
+  }
 
-  attributes(obs.df) <- c(attributes(obs.df), newattrs)
-  dprint("sim data"); dprint(head(obs.df, 1))
+  newattrs <- FormAttributes(DAG = DAG, parents = NodeParentsNms, dataform = "wide", LTCF = LTCF_flag, tvals = all_ts, netind_cl = netind_cl)
+  newattrs_names <- names(newattrs)
+  for (attr_name in newattrs_names) {
+    setattr(x = obs.dt, name = attr_name, value = newattrs[[attr_name]])
+  }
 
   if (!wide) {
     if (length(all_ts)>1) {		# only perform conversion when there is more than one t in the simulated data
-      obs.df <- DF.to.long(obs.df)
+      # obs.df <- DF.to.long(obs.df)
+      obs.dt <- DF.to.longDT(obs.dt)
     } else {
       warning("Simulated data returned in wide format. Can't convert to long format, since only one time-point was detected.")
     }
   }
-  return(obs.df)
+
+  class(obs.dt) <- "data.frame"
+  # return(obs.df)
+  return(obs.dt)
 }
 
 #' Simulate Observed Data
@@ -413,7 +493,7 @@ simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbos
 #' @return If actions argument is missing a simulated data.frame is returned, otherwise the function returns a named list of action-specific simulated data.frames with action names giving names to corresponding list items.
 #' @family simulation functions
 #' @seealso \code{\link{simobs}} - a wrapper function for simulating observed data only; \code{\link{simfull}} - a wrapper function for simulating full data only; \code{\link{doLTCF}} - forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
-#' @example tests/RUnit/sim.impute.examples12.R
+#' @example tests/examples/sim.impute.examples12.R
 #' @export
 sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbose = getOption("simcausal.verbose")) {
   # *) check if actions argument is missing -> simulate observed data from the DAG
@@ -457,7 +537,7 @@ sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbo
 #' @return Modified \code{data.frame}, all time-varying missing variables after the \code{EFU} outcome specified in \code{LTCF} are forward imputed with their last available non-missing value.
 #' @family data manipulation functions
 #' @seealso \code{\link{sim}}, \code{\link{simobs}} and \code{\link{simfull}} for simulating data with and without carry forward imputation.
-#' @example tests/RUnit/sim.impute.examples12.R
+#' @example tests/examples/sim.impute.examples12.R
 #' @export
 doLTCF <- function(data, LTCF) {
   DAG <- attr(data, "DAG")
@@ -515,10 +595,12 @@ doLTCF <- function(data, LTCF) {
 #'
 #' @param df_wide A \code{data.frame} in wide format
 #' @return A \code{data.frame} object in long format
-#' @seealso \code{\link{DF.to.longDT}} - a faster version of \code{DF.to.long} that produces a \code{data.table} object as an output.
+#' @seealso \code{\link{DF.to.longDT}} - a faster version of \code{DF.to.long} that uses \code{data.table} package
 #' @family data manipulation functions
 #' @export
 DF.to.long <- function(df_wide) {
+  if (is.data.table(df_wide)) class(df_wide) <- "data.frame"
+
   Nsamp <- nrow(df_wide)
   all_ts <- get_allts(df_wide) # calculate actual time values used in the simulated data	
   attnames <- attr(df_wide, "attnames")
@@ -581,27 +663,29 @@ DF.to.long <- function(df_wide) {
   simdf_long
 }
 
-# @importFrom reshape2 melt
 #' @import data.table
 NULL
-#' Convert Data from Wide to Long Format Using \code{dcast.data.table}
+#' Faster Conversion of Data from Wide to Long Format Using \code{dcast.data.table}
 #'
-#' This utility function takes a simulated data.frame in wide format as an input and converts it into a long format 
-#' using \pkg{data.table} package functions \code{melt.data.table} and \code{dcast.data.table}.
+#' Faster utility function for converting wide-format \code{data.frame} into a long format.
+#' Internally uses \pkg{data.table} package functions \code{melt.data.table} and \code{dcast.data.table}.
 #'
 #' Keeps all covariates that appear only once and at the first time-point constant (carry-forward).
 #'
 #' All covariates that appear fewer than range(t) times are imputed with NA for missing time-points.
 #'
 #' Observations with all NA's for all time-varying covariates are removed.
-#' 
+#'
 #' When removing NA's the time-varying covariates that are attributes (attnames) are not considered.
 #'
-#' @param df_wide A \code{data.frame} in wide format
-#' @return A \code{data.table} object in long format
+#' @param df_wide A \code{data.frame} or \code{data.table} in wide format
+#' @param return_DF \code{TRUE} (default) to return a \code{data.frame}, \code{FALSE} returns a \code{data.table}
+#' @return A \code{data.frame} in long format
 #' @family data manipulation functions
 #' @export
-DF.to.longDT <- function(df_wide) {
+DF.to.longDT <- function(df_wide, return_DF = TRUE) {
+  assertthat::assert_that(assertthat::is.flag(return_DF))
+  assertthat::assert_that(data.table::is.data.table(df_wide)||is.data.frame(df_wide))
   # wrapping any call inside this function call will suppress all warnings:
   SuppressAllWarnings <- function(expr) {
     h <- function (w) {
@@ -624,13 +708,12 @@ DF.to.longDT <- function(df_wide) {
 
   dprint("all_ts"); dprint(all_ts)
   dprint("node_nms"); dprint(node_nms)
-  dprint("head(df_wide)"); dprint(head(df_wide))
 
   # if there are no time-points (t) attributes, then the long vs. wide format is undefined.
   if (length(all_ts)==0) return(df_wide)
   #******************************************************************************************************
   # this will create a copy of the object, wont modify the original object in the calling environment
-  df_wide <- data.table(df_wide)
+  if (!is.data.table(df_wide)) df_wide <- data.table(df_wide)
   # !!!!! NOTE: THIS WILL convert the data.frame in the calling environment to data.table!!!!!!
   # To cancel that run class(df_wide) <- "data.frame" afterwards
   # data.table::setDT(df_wide, giveNames=TRUE, keep.rownames=FALSE)  # convert data.frame to data.table by reference (without copying)
@@ -705,9 +788,18 @@ DF.to.longDT <- function(df_wide) {
   if (length(attnames)>0) v.names <- v.names[!v.names%in%attnames]
   dprint("v.names after rem attrs"); dprint(v.names)
   simDT_long <- simDT_long[rowSums(is.na(simDT_long[,v.names, with=FALSE]))<length(v.names),] # 3) remove last NA rows (after censoring or EFUP)
-  attributes(simDT_long) <- c(attributes(simDT_long), newattrs)
-  attr(simDT_long, "v.names") <- v.names
-  simDT_long
+
+  # attributes(simDT_long) <- c(attributes(simDT_long), newattrs)
+  newattrs_names <- names(newattrs)
+  for (attr_name in newattrs_names) {
+    setattr(x = simDT_long, name = attr_name, value = newattrs[[attr_name]])
+  }
+  # attr(simDT_long, "v.names") <- v.names
+  setattr(x = simDT_long, name = "v.names", value = v.names)
+
+  if (return_DF) class(simDT_long) <- "data.frame"
+
+  return(simDT_long)
 }
 
 # NOT IMPLEMENTED
