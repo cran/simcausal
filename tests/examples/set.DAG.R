@@ -1,42 +1,38 @@
 #---------------------------------------------------------------------------------------
-# EXAMPLE 1A: Define some Bernoulli nodes, survival outcome Y and put it together in a 
+# EXAMPLE 1A: Define some Bernoulli nodes, survival outcome Y and put it together in a
 # DAG object
 #---------------------------------------------------------------------------------------
-W1 <- node(name = "W1", distr = "rbern", 
+W1node <- node(name = "W1", distr = "rbern",
 	prob = plogis(-0.5), order = 1)
-W2 <- node(name = "W2", distr = "rbern", 
+W2node <- node(name = "W2", distr = "rbern",
 	prob = plogis(-0.5 + 0.5 * W1), order = 2)
-A <- node(name = "A", distr = "rbern", 
+Anode <- node(name = "A", distr = "rbern",
 	prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2), order = 3)
-Y <- node(name = "Y", distr = "rbern", 
+Ynode <- node(name = "Y", distr = "rbern",
 	prob = plogis(-0.1 + 1.2 * A + 0.3 * W1 + 0.3 * W2), order = 4)
-D1A <- set.DAG(c(W1,W2,A,Y))
+D1Aset <- set.DAG(c(W1node,W2node,Anode,Ynode))
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 1B: Same as 1A using +node interface and no order argument
 #---------------------------------------------------------------------------------------
 D1B <- DAG.empty()
-D1B <- D1B + node(name = "W1", distr = "rbern", 
-	prob = plogis(-0.5))
-D1B <- D1B + node(name = "W2", distr = "rbern", 
-	prob = plogis(-0.5 + 0.5 * W1))
-D1B <- D1B + node(name = "A", distr = "rbern", 
-	prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2))
-D1B <- D1B + node(name = "Y", distr = "rbern", 
-	prob = plogis(-0.1 + 1.2 * A + 0.3 * W1 + 0.3 * W2))
-D1B <- set.DAG(D1B)
+D1B <- D1B +
+  node(name = "W1", distr = "rbern", prob = plogis(-0.5)) +
+  node(name = "W2", distr = "rbern", prob = plogis(-0.5 + 0.5 * W1)) +
+  node(name = "A", distr = "rbern", prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2)) +
+  node(name = "Y", distr = "rbern", prob = plogis(-0.1 + 1.2 * A + 0.3 * W1 + 0.3 * W2))
+D1Bset <- set.DAG(D1B)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 1C: Same as 1A and 1B using add.nodes interface and no order argument
 #---------------------------------------------------------------------------------------
 D1C <- DAG.empty()
-D1C <- add.nodes(D1C, node(name = "W1", distr = "rbern", 
-	prob = plogis(-0.5)))
-D1C <- add.nodes(D1C, node(name = "W2", distr = "rbern", 
+D1C <- add.nodes(D1C, node(name = "W1", distr = "rbern", prob = plogis(-0.5)))
+D1C <- add.nodes(D1C, node(name = "W2", distr = "rbern",
 	prob = plogis(-0.5 + 0.5 * W1)))
-D1C <- add.nodes(D1C, node(name = "A", distr = "rbern", 
+D1C <- add.nodes(D1C, node(name = "A", distr = "rbern",
 	prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2)))
-D1C <- add.nodes(D1C, node(name = "Y", distr = "rbern", 
+D1C <- add.nodes(D1C, node(name = "Y", distr = "rbern",
 	prob = plogis(-0.1 + 1.2 * A + 0.3 * W1 + 0.3 * W2)))
 D1C <- set.DAG(D1C)
 
@@ -44,19 +40,19 @@ D1C <- set.DAG(D1C)
 # EXAMPLE 1D: Add a uniformly distributed node and redefine outcome Y as categorical
 #---------------------------------------------------------------------------------------
 D_unif <- DAG.empty()
-D_unif <- D_unif + 
-node("W1", distr = "rbern", prob = plogis(-0.5)) + 
-node("W2", distr = "rbern", prob = plogis(-0.5 + 0.5 * W1)) + 
-node("W3", distr = "runif", min = plogis(-0.5 + 0.7 * W1 + 0.3 * W2), max = 10) + 
-node("An", distr = "rbern", prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2 - 0.2 * sin(W3)))
+D_unif <- D_unif +
+ node("W1", distr = "rbern", prob = plogis(-0.5)) +
+ node("W2", distr = "rbern", prob = plogis(-0.5 + 0.5 * W1)) +
+ node("W3", distr = "runif", min = plogis(-0.5 + 0.7 * W1 + 0.3 * W2), max = 10) +
+ node("An", distr = "rbern", prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2 - 0.2 * sin(W3)))
 # Categorical syntax 1 (probabilities as values):
-D_cat_1 <- D_unif + node("Y", distr = "rcategor", probs = {0.3; 0.4})
+D_cat_1 <- D_unif + node("Y", distr = "rcat.b1", probs = {0.3; 0.4})
 D_cat_1 <- set.DAG(D_cat_1)
 # Categorical syntax 2 (probabilities as formulas):
-D_cat_2 <- D_unif + 
-node("Y", distr = "rcategor", 
-	probs={plogis(-0.1 + 1.2 * An + 0.3 * W1 + 0.3 * W2 + 0.2 * cos(W3)); 
-			plogis(-0.5 + 0.7 * W1)})
+D_cat_2 <- D_unif +
+node("Y", distr = "rcat.b1",
+	probs={plogis(-0.1 + 1.2 * An + 0.3 * W1 + 0.3 * W2 + 0.2 * cos(W3));
+			   plogis(-0.5 + 0.7 * W1)})
 D_cat_2 <- set.DAG(D_cat_2)
 
 #---------------------------------------------------------------------------------------
@@ -64,57 +60,53 @@ D_cat_2 <- set.DAG(D_cat_2)
 # for L2 as a function of node L1
 #---------------------------------------------------------------------------------------
 D <- DAG.empty()
-D <- D + 
-node("L1", t = 0, distr = "rbinom", 
-	prob = 0.05, size = 1) + 
-node("L2", t = 0, distr = "rbinom", 
-	prob = ifelse(L1[0] == 1, 0.5, 0.1), size = 1)
-D <- set.DAG(D)
+D <- D +
+node("L1", t = 0, distr = "rbinom", prob = 0.05, size = 1) +
+node("L2", t = 0, distr = "rbinom", prob = ifelse(L1[0] == 1, 0.5, 0.1), size = 1)
+Dset <- set.DAG(D)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 2B: Equivalent to 2A, passing argument size to rbinom inside a named list
 # params
 #---------------------------------------------------------------------------------------
 D <- DAG.empty()
-D <- D + 
-node("L1", t = 0, distr = "rbinom", 
-	prob = 0.05, params = list(size = 1)) + 
-node("L2", t = 0, distr = "rbinom", 
+D <- D +
+node("L1", t = 0, distr = "rbinom", prob = 0.05, params = list(size = 1)) +
+node("L2", t = 0, distr = "rbinom",
 	prob = ifelse(L1[0] == 1,0.5,0.1), params = list(size = 1))
-D <- set.DAG(D)
+Dset <- set.DAG(D)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 2C: Equivalent to 2A and 2B, define Bernoulli nodes using a wrapper "rbern"
 #---------------------------------------------------------------------------------------
 D <- DAG.empty()
-D <- D + 
-node("L1", t = 0, distr = "rbern", prob = 0.05) + 
+D <- D +
+node("L1", t = 0, distr = "rbern", prob = 0.05) +
 node("L2", t = 0, distr = "rbern", prob = ifelse(L1[0] == 1, 0.5, 0.1))
-D <- set.DAG(D)
+Dset <- set.DAG(D)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 3: Define node with normal distribution using rnorm() R function
 #---------------------------------------------------------------------------------------
 D <- DAG.empty()
 D <- D + node("L2", t = 0, distr = "rnorm", mean = 10, sd = 5)
-D <- set.DAG(D)
+Dset <- set.DAG(D)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 4: Define 34 Bernoulli nodes, or 2 Bernoulli nodes over 17 time points,
-# prob argument contains .() expression that is immediately evaluated in the calling 
-# environment (.(t_end) will evaluate to 16)
 #---------------------------------------------------------------------------------------
 t_end <- 16
 D <- DAG.empty()
-D <- D + 
-node("L2", t = 0:t_end, distr = "rbinom", 
-	prob = ifelse(t == .(t_end), 0.5, 0.1), size = 1) + 
-node("L1", t = 0:t_end, distr = "rbinom", 
+D <- D +
+node("L2", t = 0:t_end, distr = "rbinom",
+	prob = ifelse(t == t_end, 0.5, 0.1), size = 1) +
+node("L1", t = 0:t_end, distr = "rbinom",
 	prob = ifelse(L2[0] == 1, 0.5, 0.1), size = 1)
-D <- set.DAG(D)
+Dset <- set.DAG(D)
+sim(Dset, n=10)
 
 #---------------------------------------------------------------------------------------
-# EXAMPLE 5: Defining new distribution function 'rbern', defining and passing a custom 
+# EXAMPLE 5: Defining new distribution function 'rbern', defining and passing a custom
 # vectorized node function 'customfun'
 #---------------------------------------------------------------------------------------
 rbern <- function(n, prob) { # defining a bernoulli wrapper based on R rbinom function
@@ -130,8 +122,7 @@ node("W1", distr = "rbern", prob = 0.05) +
 node("W2", distr = "rbern", prob = customfun(W1, 0.5)) +
 node("W3", distr = "rbern", prob = ifelse(W1 == 1, 0.5, 0.1))
 D1d <- set.DAG(D, vecfun = c("customfun"))
-sim1d <- simobs(D1d, n = 200, rndseed = 1)
-
+sim(D1d, n = 10, rndseed = 1)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 6: Defining latent variables I and U.Y (will be hidden from simulated data)
@@ -139,7 +130,7 @@ sim1d <- simobs(D1d, n = 200, rndseed = 1)
 D <- DAG.empty()
 D <- D +
   node("I",
-    distr = "rcategor.int",
+    distr = "rcat.b1",
     probs = c(0.1, 0.2, 0.2, 0.2, 0.1, 0.1, 0.1)) +
   node("W1",
     distr = "rnorm",
@@ -159,60 +150,107 @@ D <- D +
     distr = "rconst",
     const = -0.5 + 1.2*A + 0.1*W1 + 0.3*W2 + 0.2*W3 + 0.2*I + U.Y)
 Dset1 <- set.DAG(D, latent.v = c("I", "U.Y"))
-simobs(Dset1, n = 200, rndseed = 1)
+sim(Dset1, n = 10, rndseed = 1)
 
 #---------------------------------------------------------------------------------------
 # EXAMPLE 7: Multivariate random variables
 #---------------------------------------------------------------------------------------
-require("mvtnorm")
+if (requireNamespace("mvtnorm", quietly = TRUE)) {
+  D <- DAG.empty()
+  # 2 dimensional normal (uncorrelated), using rmvnorm function from rmvnorm package:
+  D <- D +
+    node(c("X1","X2"), distr = "mvtnorm::rmvnorm",
+      asis.params = list(mean = "c(0,1)")) +
+  # Can define a degenerate (rconst) multivariate node:
+    node(c("X1.copy", "X2.copy"), distr = "rconst", const = c(X1, X2))
+  Dset1 <- set.DAG(D, verbose = TRUE)
+  sim(Dset1, n = 10)
+}
+
+# On the other hand this syntax wont work,
+# since simcausal will parse c(0,1) into a two column matrix:
+\dontrun{
 D <- DAG.empty()
-
-# 3 dimensional normal (uncorrelated), using rmvnorm function from rmvnorm package:
-D <- D +
-  node(c("X1","X2","X3"), distr = "rmvnorm", mean = c(0,1,2))
-
-# Bivariate normal (correlation coef 0.75):
-D <- D +
-  node(c("Y1","Y2"), distr = "rmvnorm",
-    mean = c(0,1),
-    sigma = matrix(c(1,0.75,0.75,1), ncol=2))
-
-# Can use any component of such multivariate nodes when defining future nodes:
-D <- D + node("A", distr = "rconst", const = 1 - X1)
+D <- D + node(c("X1","X2"), distr = "mvtnorm::rmvnorm", mean = .(c(0,1)))
 Dset1 <- set.DAG(D, verbose = TRUE)
-dat1 <- sim(Dset1, n = 200)
+}
 
-# Bivariate uniform copula using copula package (correlation coef 0.75):
-require("copula")
-D <- DAG.empty()
-D <- D +
-  node(c("Y1","Y2"), distr = "rCopula",
-    copula = normalCopula(0.75, dim = 2))
-Dset2 <- set.DAG(D)
-dat2 <- sim(Dset2, n = 200)
+if (requireNamespace("mvtnorm", quietly = TRUE)) {
+  D <- DAG.empty()
+  # Bivariate normal (correlation coef 0.75):
+  D <- D +
+    node(c("X1","X2"), distr = "mvtnorm::rmvnorm",
+      asis.params = list(mean = "c(0,1)",
+        sigma = "matrix(c(1,0.75,0.75,1), ncol=2)")) +
+  # Can use any component of such multivariate nodes when defining new nodes:
+    node("A", distr = "rconst", const = 1 - X1)
+  Dset2 <- set.DAG(D, verbose = TRUE)
+  sim(Dset2, n = 10)
+}
 
-# Bivariate binomial from previous copula, with same correlation:
-vecfun.add("qbinom")
-D <- D + node("A.Bin1", distr = "rconst", const = qbinom(Y1, 10, 0.5))
-D <- D + node("A.Bin2", distr = "rconst", const = qbinom(Y2, 15, 0.7))
-Dset3 <- set.DAG(D)
-dat3 <- sim(Dset3, n = 200)
+# Time-varying multivar node (3 time-points, 2 dimensional normal)
+# plus changing the mean over time, as as function of t:
+if (requireNamespace("mvtnorm", quietly = TRUE)) {
+  D <- DAG.empty()
+  D <- D +
+    node(c("X1", "X2"), t = 0:2, distr = "mvtnorm::rmvnorm",
+      asis.params = list(
+        mean = "c(0,1) + t",
+        sigma = "matrix(rep(0.75,4), ncol=2)"))
+  Dset5b <- set.DAG(D)
+  sim(Dset5b, n = 10)
+}
+
+# Two ways to define the same bivariate uniform copula:
+if (requireNamespace("copula", quietly = TRUE)) {
+  D <- DAG.empty()
+  D <- D +
+  # with a warning since normalCopula() returns an object unknown to simcausal:
+    node(c("X1","X2"), distr = "copula::rCopula",
+      copula = .(copula::normalCopula(0.75, dim = 2))) +
+  # same, but with no warning:
+    node(c("X1.dup","X2.dup"), distr = "copula::rCopula",
+      asis.params = list(copula = "copula::normalCopula(0.75, dim = 2)"))
+  vecfun.add("qbinom")
+  # Bivariate binomial derived from previous copula, with same correlation:
+  D <- D +
+    node(c("A.Bin1", "A.Bin2"), distr = "rconst",
+      const = c(qbinom(X1, 10, 0.5), qbinom(X2, 15, 0.7)))
+  Dset3 <- set.DAG(D)
+  sim(Dset3, n = 10)
+}
 
 # Same as "A.Bin1" and "A.Bin2", but directly using rmvbin function in bindata package:
-require("bindata")
-D <- DAG.empty()
-D <- D +
-  node(c("B.Bin1","B.Bin2"), distr = "rmvbin",
-    margprob = c(0.5, 0.5),
-    bincorr = matrix(c(1,0.75,0.75,1), ncol=2))
-Dset4 <- set.DAG(D)
-dat4 <- sim(Dset4, n = 200)
+if (requireNamespace("bindata", quietly = TRUE)) {
+  D <- DAG.empty()
+  D <- D +
+    node(c("B.Bin1","B.Bin2"), distr = "bindata::rmvbin",
+      asis.params = list(
+        margprob = "c(0.5, 0.5)",
+        bincorr = "matrix(c(1,0.75,0.75,1), ncol=2)"))
+  Dset4b <- set.DAG(D)
+  sim(Dset4b, n = 10)
+}
 
-# Time-varying multivar node (3 time-points, 2 dimensional normal):
+#---------------------------------------------------------------------------------------
+# EXAMPLE 8: Combining simcausal non-standard evaluation with .() forced evaluation
+#---------------------------------------------------------------------------------------
+coefAi <- 1:10
 D <- DAG.empty()
 D <- D +
-  node(c("X1", "X2"), t = 0:2, distr = "rmvnorm",
-    mean = c(0,1),
-    sigma = matrix(rep(0.75,4), ncol=2))
-Dset5 <- set.DAG(D)
-dat5 <- sim(Dset5, n = 200)
+  node("A", t = 1, distr = "rbern", prob = 0.7) +
+  node("A", t = 2:10, distr = "rconst", const = .(coefAi[t]) * A[t-1])
+Dset8 <- set.DAG(D)
+sim(Dset8, n = 10)
+
+#---------------------------------------------------------------------------------------
+# TWO equivalent ways of creating a multivariate node (just repeating W1 and W2):
+#---------------------------------------------------------------------------------------
+D <- DAG.empty()
+D <- D + node("W1", distr = "rbern", prob = 0.45)
+D <- D + node("W2", distr = "rconst", const = 1)
+D <- D + node(c("W1.copy1", "W2.copy1"), distr = "rconst", const = c(W1, W2))
+create_mat <- function(W1, W2) cbind(W1, W2)
+D <- D + node(c("W1.copy2", "W2.copy2"), distr = "rconst", const = .(create_mat(W1, W2)))
+Dset <- set.DAG(D)
+sim(Dset, n=10, rndseed=1)

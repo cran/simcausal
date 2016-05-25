@@ -64,7 +64,7 @@ getactions <- function(DAG, actions) {
 
 # Internal function for simulation data from any DAG
 # If prev.data is not NULL all the nodes in DAG will be evaluated in the environment of prev.data alone
-simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, prev.data = NULL, verbose = getOption("simcausal.verbose")) {
+simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, rndseed.reset.node = NULL, prev.data = NULL, verbose = getOption("simcausal.verbose")) {
   assertthat::assert_that(assertthat::is.count(Nsamp) || as.integer(Nsamp)==0L)
   if (!is.null(rndseed)) {
     set.seed(rndseed)
@@ -87,7 +87,9 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         } else if (len==Nsamp) {
           param <- param[!EFUP.prev]
         } else {
-          stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the distribution parameters evaluated to an incorrect vector length, check syntax.")
+          # stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the distribution parameters evaluated to an incorrect vector length, check syntax.")
+          if (verbose) message("evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%
+              ".\n One of the distribution parameters evaluated to non-standard vector length (its neither 1 nor n), make sure the distribution function knows how to handle it.")
         }
         param
       }
@@ -102,17 +104,21 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         distparam <- check_len(distparam)
       } else if (is.matrix(distparam)) {
         if (nrow(distparam)==1) { # for mtx with 1 row -> repeat N_notNA_samp times:
-          distparam <- matrix(distparam, nrow = N_notNA_samp, ncol = ncol(distparam), byrow = TRUE)
+          # distparam <- matrix(distparam, nrow = N_notNA_samp, ncol = ncol(distparam), byrow = TRUE)
         } else if (nrow(distparam)==Nsamp) { # for mtx with Nsamp rows -> subset mtx[!EFUP.prev,]
           distparam <- distparam[!EFUP.prev, , drop=FALSE]
         } else {
-          stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the distribution parameters evaluated to an incorrect vector length, check syntax.")
+          # stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the distribution parameters evaluated to an incorrect vector length, check syntax.")
+          if (verbose) message("evaluating node "%+% cur.node$name %+%
+              " expression(s): One of the distribution parameters evaluated to a matrix of non-standard dimensions (its neither 1 nor n rows), make sure the distribution function knows how to handle it.")
         }
       } else {
         # print("expr_str"); print(expr_str)
         # print(class(expr_str))
         # stop("...one of the distribution parameters evaluated to unsported data type...")
-        stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the formulas evaluated to an unsported data type, check syntax.")
+        # stop("error while evaluating node "%+% cur.node$name %+%" expression(s): "%+%expr_str%+%".\n One of the formulas evaluated to an unsported data type, check syntax.")
+        if (verbose) message("The node " %+%  cur.node$name %+% " expression(s): "%+%expr_str%+%
+            ".\n One of the formulas evaluated to unknown data type. Make sure the distribution function knowns how to handle it...")
       }
       distparam
     }
@@ -124,7 +130,10 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
       if (!is.null(distr.fun <- get0(distr, envir = user.env, mode = "function"))) {
         if (verbose) message(distr %+% ": note this distribution could not be located in package namespace, simulating from user-defined distribution found under the same name")
       } else {
-        stop(distr %+%": this distribution function can\'t be found")
+        namespace_distr <- unlist(strsplit(distr, "::"))
+        distr.fun <- tryCatch(getFromNamespace(x = namespace_distr[2], ns = namespace_distr[1], envir = user.env))
+        if (inherits(distr.fun, "try-error")) stop(distr %+% ": this node distribution function could not be located")
+        # stop(distr %+%": this distribution function can\'t be found")
       }
     }
 
@@ -133,7 +142,6 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     dprint("before standardize newNodeParams$dist_params:"); dprint(newNodeParams$dist_params)
     if (!asis.samp) {
       for (idx in seq_along(newNodeParams$dist_params)) {
-        # newNodeParams$dist_params <- lapply(newNodeParams$dist_params, standardize_param)
         if (!asis.flags[[idx]]) newNodeParams$dist_params[[idx]] <- standardize_param(newNodeParams$dist_params[[idx]])
       }
     }
@@ -205,7 +213,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
 
   NodeParentsNms <- vector("list", length = length(DAG))	# list that will have parents names for each node
   names(NodeParentsNms) <- names(DAG)
-  
+
   # initialize the node formula evaluator class (Define_sVar):
   node_evaluator <- Define_sVar$new() # netind_cl = netind_cl
   t_pts <- NULL
@@ -227,7 +235,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     # See if current expr naming strucutre in Define_sVar can be recycled for sampling from multivariate densities
     # NEED TO ADDRESS: WHEN A CONSTANT (length==1) IS PASSED AS A PARAMETER, DON'T ALWAYS WANT TO TURN IT INTO A VECTOR OF LENGTH n
     #------------------------------------------------------------------------
-    
+
     # setting the node-specific user calling environment for the evaluator:
     # node_evaluator$set.user.env(cur.node$node.env)
     eval_expr_res <- node_evaluator$eval.nodeforms(cur.node = cur.node, data.df = if (!is.null(prev.data)) prev.data else obs.dt)
@@ -244,6 +252,12 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
     #------------------------------------------------------------------------
     # SAMPLE NEW COVARIATE BASED ON DISTR PARAMS
     #------------------------------------------------------------------------
+
+    # reset the seed if the current node matches argument rndseed.reset.node
+    if (!is.null(rndseed) && !is.null(rndseed.reset.node)) {
+      if (rndseed.reset.node %in% cur.node$name) set.seed(NULL)
+    }
+
     distr <- cur.node$distr
     if ("DAG.net" %in% class(cur.node)) {
 
@@ -254,7 +268,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
       # USING AS-IS FOR SAMPLING NETWORK BECAUSE THE OUTPUT IS A MATRIX. THIS IS A BAD WAY TO SOLVE THIS.
       # A BETTER SOLUTION IS TO ALLOW THE distr RESULT TO BE A VECTOR OR MATRIX (for multivariate RVs)
       # *****************************************************************
-      NetIndMat <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev, 
+      NetIndMat <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev,
                                   cur.node = cur.node, expr_str = cur.node$dist_params, asis.samp = TRUE)
       cur.node$Kmax <- ncol(NetIndMat)
       netind_cl <- NetIndClass$new(nobs = Nsamp, Kmax = cur.node$Kmax)
@@ -281,7 +295,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         }
         NodeParentsNms[[cur.node$name]] <- c(NodeParentsNms[[cur.node$name]], newNodeParams$par.names)
       }
- 
+
       newVar <- sampleNodeDistr(newNodeParams = newNodeParams, distr = distr, EFUP.prev = EFUP.prev,
                                 cur.node = cur.node, expr_str = cur.node$dist_params)
     }
@@ -327,7 +341,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
         # in doLTCF():
         # if  (is.EFUP(cur.node)&(cur.outcome))
       #------------------------------------------------------------------------
-    
+
       # 2 ways to assign several new vars with data.table (1st is the fastest)
       if (is.matrix(newVar)) {
         for (col in cur.node$mv.names) {
@@ -398,8 +412,11 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
       warning("Simulated data returned in wide format. Can't convert to long format, since only one time-point was detected.")
     }
   }
-
   class(obs.dt) <- "data.frame"
+  # reset the seed to NULL if it was previously set
+  if (!is.null(rndseed)) {
+    set.seed(NULL)
+  }
   # return(obs.df)
   return(obs.dt)
 }
@@ -412,15 +429,18 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, pre
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
 #' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. See the vignette, \code{\link{sim}} and \code{\link{doLTCF}} for additional details.
 #' @param rndseed Seed for the random number generator.
-#' @param verbose Set to \code{TRUE} to print messages on status and information to the console. 
+#' @param rndseed.reset.node When \code{rndseed} is specified, use this argument to specify the name of the \code{DAG} node at which the random number generator seed is reset back to \code{NULL} (simulation function will call \code{set.seed(NULL)}).
+#' Can be useful if one wishes to simulate data using the set seed \code{rndseed} only for the first K nodes of the DAG and use an entirely random sample when simulating the rest of the nodes starting at K+1 and on.
+#' The name of such (K+1)th order \code{DAG} node should be then specified with this argument.
+#' @param verbose Set to \code{TRUE} to print messages on status and information to the console.
 #'  Turn this off by default using options(simcausal.verbose=FALSE).
 #' @return A \code{data.frame} where each column is sampled from the conditional distribution specified by the corresponding \code{DAG} object node.
 #' @family simulation functions
 #' @seealso \code{\link{simfull}} - a wrapper function for simulating full data only; \code{\link{sim}} - a wrapper function for simulating both types of data; \code{\link{doLTCF}} for forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
 #' @export
-simobs <- function(DAG, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbose = getOption("simcausal.verbose")) {
+simobs <- function(DAG, n, wide = TRUE, LTCF = NULL, rndseed = NULL, rndseed.reset.node = NULL, verbose = getOption("simcausal.verbose")) {
   if (!is.DAG(DAG)) stop("DAG argument must be an object of class DAG")
-  simFromDAG(DAG=DAG, Nsamp=n, wide=wide, LTCF=LTCF, rndseed=rndseed, verbose=verbose)
+  simFromDAG(DAG=DAG, Nsamp=n, wide=wide, LTCF=LTCF, rndseed=rndseed, rndseed.reset.node=rndseed.reset.node, verbose=verbose)
 }
 
 #' Simulate Full Data (From Action DAG(s))
@@ -431,13 +451,16 @@ simobs <- function(DAG, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbose = g
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
 #' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. See the vignette, \code{\link{sim}} and \code{\link{doLTCF}} for additional details.
 #' @param rndseed Seed for the random number generator.
-#' @param verbose Set to \code{TRUE} to print messages on status and information to the console. 
+#' @param rndseed.reset.node When \code{rndseed} is specified, use this argument to specify the name of the \code{DAG} node at which the random number generator seed is reset back to \code{NULL} (simulation function will call \code{set.seed(NULL)}).
+#' Can be useful if one wishes to simulate data using the set seed \code{rndseed} only for the first K nodes of the DAG and use an entirely random sample when simulating the rest of the nodes starting at K+1 and on.
+#' The name of such (K+1)th order \code{DAG} node should be then specified with this argument.
+#' @param verbose Set to \code{TRUE} to print messages on status and information to the console.
 #'  Turn this off by default using options(simcausal.verbose=FALSE).
 #' @return A named list, each item is a \code{data.frame} corresponding to an action specified by the actions argument, action names are used for naming these list items.
 #' @family simulation functions
 #' @seealso \code{\link{simobs}} - a wrapper function for simulating observed data only; \code{\link{sim}} - a wrapper function for simulating both types of data; \code{\link{doLTCF}} for forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
 #' @export
-simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbose = getOption("simcausal.verbose")) {
+simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, rndseed.reset.node = NULL, verbose = getOption("simcausal.verbose")) {
   if (!is.null(rndseed)) {
     set.seed(rndseed)
   }
@@ -456,7 +479,7 @@ simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbos
   for (idx_act in c(1:length(actions))) {	# loop over each action/intervention/regimen DAG
     actname <- names(actions)[idx_act]
     actDAG <- actions[[idx_act]]
-    fulldf <- try(simFromDAG(DAG=actDAG, Nsamp=n, wide=wide, LTCF=LTCF, rndseed=rndseed, verbose=verbose))
+    fulldf <- try(simFromDAG(DAG=actDAG, Nsamp=n, wide=wide, LTCF=LTCF, rndseed=rndseed, rndseed.reset.node=rndseed.reset.node, verbose=verbose))
     if(inherits(fulldf, "try-error")) {
     	stop("simulating full data for action '"%+%actname%+%"' resulted in error...", call. = FALSE)
     }
@@ -478,32 +501,35 @@ simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbos
 #'
 #' This function simulates full data based on a list of intervention DAGs, returning a list of \code{data.frame}s. See the vignette for examples and detailed description.
 #' @section Forward Imputation:
-#' By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA). 
-#' The end of follow-up event occurs when a binary node of type \code{EFU=TRUE} is equal to 1, indicating a failing or right-censoring event. 
-#' To forward impute the values of the time-varying nodes after the occurrence of the \code{EFU} event, set the LTCF argument to a name of the EFU node representing this event. 
+#' By default, when LTCF is left unspecified, all variables that follow after any end of follow-up (EFU) event are set to missing (NA).
+#' The end of follow-up event occurs when a binary node of type \code{EFU=TRUE} is equal to 1, indicating a failing or right-censoring event.
+#' To forward impute the values of the time-varying nodes after the occurrence of the \code{EFU} event, set the LTCF argument to a name of the EFU node representing this event.
 #' For additional details and examples see the vignette and \code{\link{doLTCF}} function.
 #' @param DAG A DAG objects that has been locked with set.DAG(DAG). Observed data from this DAG will be simulated if actions argument is omitted.
 #' @param actions Character vector of action names which will be extracted from the DAG object. Alternatively, this can be a list of action DAGs selected with \code{A(DAG)} function, in which case the argument \code{DAG} is unused. When \code{actions} is omitted, the function returns simulated observed data (see \code{simobs}).
 #' @param n Number of observations to sample.
 #' @param wide A logical, if TRUE the output data is generated in wide format, if FALSE, the output longitudinal data in generated in long format
-#' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event. 
+#' @param LTCF If forward imputation is desired for the missing variable values, this argument should be set to the name of the node that indicates the end of follow-up event.
 #' @param rndseed Seed for the random number generator.
-#' @param verbose Set to \code{TRUE} to print messages on status and information to the console. 
+#' @param rndseed.reset.node When \code{rndseed} is specified, use this argument to specify the name of the \code{DAG} node at which the random number generator seed is reset back to \code{NULL} (simulation function will call \code{set.seed(NULL)}).
+#' Can be useful if one wishes to simulate data using the set seed \code{rndseed} only for the first K nodes of the DAG and use an entirely random sample when simulating the rest of the nodes starting at K+1 and on.
+#' The name of such (K+1)th order \code{DAG} node should be then specified with this argument.
+#' @param verbose Set to \code{TRUE} to print messages on status and information to the console.
 #'  Turn this off by default using options(simcausal.verbose=FALSE).
 #' @return If actions argument is missing a simulated data.frame is returned, otherwise the function returns a named list of action-specific simulated data.frames with action names giving names to corresponding list items.
 #' @family simulation functions
 #' @seealso \code{\link{simobs}} - a wrapper function for simulating observed data only; \code{\link{simfull}} - a wrapper function for simulating full data only; \code{\link{doLTCF}} - forward imputation of the missing values in already simulating data; \code{\link{DF.to.long}}, \code{\link{DF.to.longDT}} - converting longitudinal data from wide to long formats.
 #' @example tests/examples/sim.impute.examples12.R
 #' @export
-sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbose = getOption("simcausal.verbose")) {
+sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, rndseed.reset.node = NULL, verbose = getOption("simcausal.verbose")) {
   # *) check if actions argument is missing -> simulate observed data from the DAG
   # *) if actions consist of characters, try to extract those actions from the DAG and simulate full data
   # SIMULATE OBSERVED DATA FROM DAG (if no actions)
-  if (missing(actions)) {	
+  if (missing(actions)) {
     if (!is.DAG(DAG)) stop("DAG argument must be an object of class DAG")
     if (!is.DAGlocked(DAG)) stop("call set.DAG() before attempting to simulate data from DAG")
     if (verbose) message("simulating observed dataset from the DAG object")
-    return(simobs(DAG = DAG, n = n, wide = wide, LTCF = LTCF, rndseed = rndseed, verbose = verbose))
+    return(simobs(DAG = DAG, n = n, wide = wide, LTCF = LTCF, rndseed = rndseed, rndseed.reset.node = rndseed.reset.node, verbose = verbose))
   # SIMULATE FULL DATA FROM ACTION DAGs (when actions are present)
   } else {
     if (is.character(actions)) { # grab appropriate actions from the DAG by name
@@ -516,7 +542,7 @@ sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbo
       stop("argument actions must be a character vector of action names or a list of action DAGs")
     }
     if (verbose) message("simulating action-specific datasets for action(s): "%+%paste(names(actions), collapse = " "))
-    return(simfull(actions = actions, n = n, wide = wide, LTCF = LTCF, rndseed = rndseed, verbose = verbose))
+    return(simfull(actions = actions, n = n, wide = wide, LTCF = LTCF, rndseed = rndseed, rndseed.reset.node = rndseed.reset.node, verbose = verbose))
   }
 }
 
@@ -524,11 +550,11 @@ sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, verbo
 #'
 #' Forward imputation for missing variable values in simulated data after a particular end of the follow-up event. The end of follow-up event is defined by the node of type \code{EOF=TRUE} being equal to 1.
 #' @section Details:
-#' The default behavior of the \code{sim} function consists in setting all nodes that temporally follow an \code{EFU} node whose simulated value is 1 to missing (i.e., \code{NA}). 
+#' The default behavior of the \code{sim} function consists in setting all nodes that temporally follow an \code{EFU} node whose simulated value is 1 to missing (i.e., \code{NA}).
 #' The argument \code{LTCF} of the \code{sim} function can however be used to change this default behavior and impute some of these missing values with \emph{last time point value carried forward} (LTCF).
-#' More specifically, only the missing values of time-varying nodes (i.e., those with non-missing \code{t} argument) that follow the end of follow-up event encoded by the \code{EFU} node specified by the \code{LTCF} argument will be imputed. 
-#' One can use the function \code{doLTCF} to apply the \emph{last time point value carried forward} (LTCF) imputation to an existing simulated dataset obtained from the function \code{sim} that was called with its default imputation setting (i.e., with no \code{LTCF} argument). 
-#' Illustration of the use of the LTCF imputation functionality are provided in the package vignette. 
+#' More specifically, only the missing values of time-varying nodes (i.e., those with non-missing \code{t} argument) that follow the end of follow-up event encoded by the \code{EFU} node specified by the \code{LTCF} argument will be imputed.
+#' One can use the function \code{doLTCF} to apply the \emph{last time point value carried forward} (LTCF) imputation to an existing simulated dataset obtained from the function \code{sim} that was called with its default imputation setting (i.e., with no \code{LTCF} argument).
+#' Illustration of the use of the LTCF imputation functionality are provided in the package vignette.
 #'
 #' The first example below shows the default data format of the \code{sim} function after an end of the follow-up event and how this behavior can be modified to generate data with LTCF imputation by either using the \code{LTCF} argument of the
 #' \code{sim} function or by calling the \code{doLTCF} function. The second example demonstrates how to use the \code{doLTCF} function to perform LTCF imputation on already existing data simulated with the \code{sim} function based on its default non-imputation behavior.
@@ -590,7 +616,7 @@ doLTCF <- function(data, LTCF) {
 #' All covariates that appear fewer than range(t) times are imputed with NA for missing time-points.
 #'
 #' Observations with all NA's for all time-varying covariates are removed.
-#' 
+#'
 #' When removing NA's the time-varying covariates that are attributes (attnames) are not considered.
 #'
 #' @param df_wide A \code{data.frame} in wide format
@@ -602,7 +628,7 @@ DF.to.long <- function(df_wide) {
   if (is.data.table(df_wide)) class(df_wide) <- "data.frame"
 
   Nsamp <- nrow(df_wide)
-  all_ts <- get_allts(df_wide) # calculate actual time values used in the simulated data	
+  all_ts <- get_allts(df_wide) # calculate actual time values used in the simulated data
   attnames <- attr(df_wide, "attnames")
   node_nms <- attr(df_wide, "node_nms")
   node_nms_split <- strsplit(node_nms, "_")
@@ -620,7 +646,7 @@ DF.to.long <- function(df_wide) {
     count_ts <- sum(idx_node)
     node_t_vals <- unlist(sapply(node_nms_split, function(t_nodename) if(t_nodename[1]%in%cur_node_name) as.integer(t_nodename[2])))
     # if node name has no "_", assume its bsl and assign first time-point:
-    if (all(is.na(node_t_vals))) node_t_vals <- all_ts[1] 
+    if (all(is.na(node_t_vals))) node_t_vals <- all_ts[1]
 
     dprint("cur_node_name: "%+%cur_node_name);
     dprint("all_ts"); dprint(all_ts)
@@ -651,7 +677,7 @@ DF.to.long <- function(df_wide) {
     }
   }
   simdf_long <- reshape(data=df_wide, varying=varying, v.names=v.names, timevar = "t", times = all_ts, sep="_", direction="long")
-  simdf_long <- simdf_long[order(simdf_long$ID, simdf_long$t),] # 1) long format is sorted by t first, then ID -> needs to be sorted by ID then time	
+  simdf_long <- simdf_long[order(simdf_long$ID, simdf_long$t),] # 1) long format is sorted by t first, then ID -> needs to be sorted by ID then time
   simdf_long <- simdf_long[,-ncol(simdf_long)]  # 2) remove last column and reorder columns ID, t, ...
   if (length(attnames)>0) v.names <- v.names[!v.names%in%attnames]
   dprint("v.names"); dprint(v.names)
@@ -754,7 +780,7 @@ DF.to.longDT <- function(df_wide, return_DF = TRUE) {
     count_ts <- sum(idx_node)
     node_t_vals <- unlist(sapply(node_nms_split, function(t_nodename) if(t_nodename[1]%in%cur_node_name) as.integer(t_nodename[2])))
     # if node name has no "_", assume its bsl and assign first time-point:
-    if (all(is.na(node_t_vals))) node_t_vals <- all_ts[1] 
+    if (all(is.na(node_t_vals))) node_t_vals <- all_ts[1]
     dprint("cur_node_name: "%+%cur_node_name);
     dprint("all_ts"); dprint(all_ts)
     # dprint("idx_node"); dprint(idx_node)
@@ -806,7 +832,7 @@ DF.to.longDT <- function(df_wide, return_DF = TRUE) {
 # will convert the dataset back to wide format from long, get the necessary attributes from simdf_long
 # convert_to_wide <- function(simdf_long) {
 # 	# Nsamp <- nrow(df_wide)
-#     # all_ts <- get_allts(simdf_long) # calculate actual time values used in the simulated data	
+#     # all_ts <- get_allts(simdf_long) # calculate actual time values used in the simulated data
 #     attnames <- attr(simdf_long, "attnames")
 #     node_nms <- attributes(simdf_long)$names[-1]
 #     # node_nms_split <- strsplit(node_nms, "_")

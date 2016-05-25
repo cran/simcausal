@@ -23,9 +23,8 @@
   # require(knitr)
   # require(data.table)
   # require(ggplot2)
-  # require(ltmle)
   # require(igraph)
-  # require(lavaan); require(lavaan.survey); require(sem); require(semPLS); 
+  # require(lavaan); require(lavaan.survey); require(sem); require(semPLS);
   # # require(OpenMx)
   # require(gems); require(aftgee); require(survsim)
   # # # Select packages to cite:
@@ -76,7 +75,7 @@
       surv <- lapply(action_names, function(actname) {
                                     res <- get_predict(actname)
                                     if (MSMres$hazard) {
-                                      res$surv <- cumprod(1-res$pred)  
+                                      res$surv <- cumprod(1-res$pred)
                                     } else {
                                       res$surv <- 1-res$pred
                                     }
@@ -92,7 +91,7 @@
     plotsurvbyMSMterm <- function(surv_melt_dat) {
       library("ggplot2")
       f_ggplot_surv_wS <- ggplot(data= surv_melt_dat, aes(x=t, y=surv)) +
-                          geom_line(aes(group = action, color = action), size=.4, linetype="dashed") + 
+                          geom_line(aes(group = action, color = action), size=.4, linetype="dashed") +
                           theme_bw()
 
     }
@@ -106,20 +105,20 @@
 
       surv_melt_dat <- rbind(surv_melt_dat1,surv_melt_dat2)
       f_ggplot_surv_wS <- ggplot(data= surv_melt_dat, aes(x=t, y=surv)) +
-                          geom_line(aes(group = action, color = action), size=.4, linetype="dashed") + 
-                          theme_bw() + 
+                          geom_line(aes(group = action, color = action), size=.4, linetype="dashed") +
+                          theme_bw() +
                           facet_wrap( ~ MSM)
-    }   
+    }
 
 ## ----chunk.est.targetMSM, eval=TRUE, echo=FALSE-----------------------------------------
-  # @param DAG Object specifying the directed acyclic graph for the observed data, 
+  # @param DAG Object specifying the directed acyclic graph for the observed data,
     # must have a well-defined MSM target parameter (\code{set.target.MSM()})
   # @param obs_df Simulated observational data
   # @param Aname Generic names of the treatment nodes (can be time-varying)
   # @param Cname Generic names of the censoring nodes (can be time-varying)
   # @param Lnames Generic names of the time-varying covariates (can be time-varying)
   # @param tvec Vector of time points for Y nodes
-  # @param actions Which actions (regimens) should be used in estimation from the observed simulated data. 
+  # @param actions Which actions (regimens) should be used in estimation from the observed simulated data.
     # If NULL then all actions that were defined in DAG will be considered.
   # @param package Character vector for R package name to use for estimation. Currently only "ltmle" is implemented.
   # @param fun Character name for R function name to employ for estimation. Currently only "ltmleMSM" is implemented.
@@ -134,7 +133,7 @@
       actions <- A(DAG)
     }
     # all time points actually used in the observed data
-    t_all <- attr(obs_df, "tvals")  
+    t_all <- attr(obs_df, "tvals")
     tvec <- outnodes$t
     t_sel <- ACLtvec
     # ltmle allows for pooling Y's over smaller subset of t's (for example t=(2:8))
@@ -154,7 +153,7 @@
     working.msm <- params.MSM$form
     msm.family <- params.MSM$family
     if (params.MSM$hazard) stop("ltmleMSM cannot estimate hazard MSMs...")
-    # the number of attributes and their dimensionality have to match between different actions 
+    # the number of attributes and their dimensionality have to match between different actions
     n_attrs <- length(attr(actions[[1]], "attnames"))
     #------------------------------------------------------------
     # define the final ltmle arrays
@@ -162,30 +161,30 @@
     summeas_arr <- array(dim = c(length(actions), (n_attrs+1), length(Ytvec)))
     # loop over actions (regimes) creating counterfactual mtx of A's for each action:
     for (action_idx in seq(actions)) {
-        # I) CREATE COUNTERFACTUAL TREATMENTS & 
+        # I) CREATE COUNTERFACTUAL TREATMENTS &
         # II) CREATE summary.measure that describes each attribute by time + regimen
-        #------------------------------------------------------------    
+        #------------------------------------------------------------
         # needs to assign observed treatments and replace the action timepoints with counterfactuals
-        A_mtx_act <- as.matrix(obs_df[,Anodes]) 
-        #------------------------------------------------------------    
+        A_mtx_act <- as.matrix(obs_df[,Anodes])
+        #------------------------------------------------------------
         action <- actions[[action_idx]]
          # action-spec. time-points
-        t_act <- as.integer(attr(action, "acttimes"))   
+        t_act <- as.integer(attr(action, "acttimes"))
         # action-spec. attribute names
-        attnames <- attr(action, "attnames")  
+        attnames <- attr(action, "attnames")
         # list of action-spec. attributes
-        attrs <- attr(action, "attrs")        
+        attrs <- attr(action, "attrs")
         # time points for which we need to evaluate the counterfactual treatment assignment as determined by action:
         #------------------------------------------------------------
         # Action t's need always be the same subset of t_sel (outcome-based times), otherwise we are in big trouble
         t_act_idx <- which(t_sel%in%t_act)
         t_chg <- t_sel[t_act_idx]
         # modify only A's which are defined in this action out of all Anodes
-        As_chg <- Anodes[t_act_idx] 
+        As_chg <- Anodes[t_act_idx]
         #------------------------------------------------------------
         # creates summary measure array that is of dimension (length(t_chg)) - time-points only defined for this action
         # which t's are in the final pooled MSM => need to save the summary measures only for these ts
-        t_vec_idx <- which(t_act%in%tvec) 
+        t_vec_idx <- which(t_act%in%tvec)
         summeas_attr <- matrix(nrow=length(attnames), ncol=length(tvec))
         #------------------------------------------------------------
         # extract values of terms in MSM formula: get all attribute values from +action(...,attrs)
@@ -198,7 +197,7 @@
           } else {
             attr_i <- attnames[attr_idx]
             val_attr_i <- attrs[[attnames[attr_idx]]]
-          } 
+          }
           # summary measures, for each action/measure
           summeas_attr[attr_idx,] <- matrix(val_attr_i, nrow=1, ncol=length(t_chg))[,t_vec_idx]
           # observed data values of the attribute
@@ -210,7 +209,7 @@
         rownames(summeas_attr) <- c(attnames, "t")
         #------------------------------------------------------------
         # add action specific summary measures to the full array
-        summeas_arr[action_idx, , ] <- summeas_attr 
+        summeas_arr[action_idx, , ] <- summeas_attr
         dimnames(summeas_arr)[[2]] <- rownames(summeas_attr)
         #------------------------------------------------------------
         # GENERATING A MATRIX OF COUNTERFACTUAL TREATMENTS:
@@ -229,7 +228,7 @@
           }
           A_mtx_act[,which(Anodes%in%Achange)] <- newA
         }
-        # Result matrix A_mtx_act has all treatments that were defined in that action replaced with 
+        # Result matrix A_mtx_act has all treatments that were defined in that action replaced with
         # their counterfactual values
         #------------------------------------------------------------
         # add action specific summary measures to the full array
@@ -242,23 +241,23 @@
 ## ----message=FALSE----------------------------------------------------------------------
 library("simcausal")
 D <- DAG.empty()
-D <- D + 
+D <- D +
   node("race",
-        distr = "rcategor",
-        probs = c(0.5, 0.25, 0.25)) + 
+        distr = "rcat.b1",
+        probs = c(0.5, 0.25, 0.25)) +
   node("W1",
         distr = "rnorm",
         mean = ifelse(race == 1, 0, ifelse(race == 2, 3, 10)),
-        sd = 1) + 
+        sd = 1) +
   node("W2",
         distr = "runif",
-        min = 0, max = 1) + 
+        min = 0, max = 1) +
   node("W3",
         distr = "rbern",
-        prob = plogis(-0.5 + 0.7 * W1 + 0.3 * W2)) + 
+        prob = plogis(-0.5 + 0.7 * W1 + 0.3 * W2)) +
   node("Anode",
         distr = "rbern",
-        prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2 - 0.2 * W3)) + 
+        prob = plogis(-0.5 - 0.3 * W1 - 0.3 * W2 - 0.2 * W3)) +
   node("Y",
         distr = "rbern",
         prob = plogis(-0.1 + 1.2 * Anode + 0.1 * W1 + 0.3 * W2 + 0.2 * W3))
@@ -273,7 +272,7 @@ str(Dset[1])
 #          vertex_attrs = list(size = 12, label.cex = 0.8))
 
 ## ----DAG1t, fig.pos='H', fig.width=10,fig.height=8,out.width='0.8\\linewidth', echo=FALSE, message=FALSE, fig.cap='Graphical representation of the structural equation model using a DAG.', pdfcrop=TRUE----
-plotDAG(Dset, xjitter = 0.3, yjitter = 0.03, 
+plotDAG(Dset, xjitter = 0.3, yjitter = 0.03,
         edge_attrs = list(width = 0.5, arrow.width = 0.4, arrow.size = 0.8),
         vertex_attrs = list(size = 12, label.cex = 0.8))
 
@@ -303,7 +302,7 @@ A(Dset)[["A0"]]$Anode
 Xdat1 <- sim(DAG = Dset, actions = c("A1", "A0"), n = 1000, rndseed = 123)
 names(Xdat1)
 nrow(Xdat1[["A1"]])
-nrow(Xdat1[["A0"]])  
+nrow(Xdat1[["A0"]])
 
 ## ----message=FALSE----------------------------------------------------------------------
 Xdat1[["A1"]][1, ]
@@ -353,33 +352,33 @@ rnorm_trunc <- function(n, mean, sd, minval = 0) {
 }
 
 ## ----message=FALSE----------------------------------------------------------------------
-Dmin0 <- DAG.empty() 
+Dmin0 <- DAG.empty()
 
-Dmin0 <- Dmin0 + 
-  node("W",    distr = "rbern", 
+Dmin0 <- Dmin0 +
+  node("W",    distr = "rbern",
         prob = plogis(-0.5)) +
-  node("Anode", distr = "rbern", 
-        prob = plogis(-0.5 - 0.3 * W)) + 
-  node("Y", distr = "rnorm_trunc", 
-        mean = -0.1 + 1.2 * Anode + 0.3 * W, 
+  node("Anode", distr = "rbern",
+        prob = plogis(-0.5 - 0.3 * W)) +
+  node("Y", distr = "rnorm_trunc",
+        mean = -0.1 + 1.2 * Anode + 0.3 * W,
         sd = 10)
 
 Dmin0set <- set.DAG(Dmin0)
 
 ## ----message=FALSE----------------------------------------------------------------------
-Dmin0 <- Dmin0 + 
-  node("Y", distr = "rnorm_trunc", 
-        mean = -0.1 + 1.2 * Anode + 0.3 * W, 
-        sd = 10, 
+Dmin0 <- Dmin0 +
+  node("Y", distr = "rnorm_trunc",
+        mean = -0.1 + 1.2 * Anode + 0.3 * W,
+        sd = 10,
         minval = 10)
 
 Dmin10set <- set.DAG(Dmin0)
 
 ## ----message=FALSE----------------------------------------------------------------------
-Dmin0 <- Dmin0 + 
-  node("Y", distr = "rnorm_trunc", 
-        mean = -0.1 + 1.2 * Anode + 0.3 * W, 
-        sd = 10, 
+Dmin0 <- Dmin0 +
+  node("Y", distr = "rnorm_trunc",
+        mean = -0.1 + 1.2 * Anode + 0.3 * W,
+        sd = 10,
         minval = ifelse(Anode == 0, 5, 10))
 
 Dminset <- set.DAG(Dmin0)
@@ -391,12 +390,12 @@ vecfun.all.print()
 power2 <- function(arg) arg^2
 
 D <- DAG.empty()
-D <- D + 
-  node("W1", distr = "rnorm", 
-        mean = 0, sd = 1) + 
-  node("W2", distr = "rnorm", 
-        mean = 0, sd = 1) + 
-  node("W3", distr = "rnorm", 
+D <- D +
+  node("W1", distr = "rnorm",
+        mean = 0, sd = 1) +
+  node("W2", distr = "rnorm",
+        mean = 0, sd = 1) +
+  node("W3", distr = "rnorm",
         mean = power2(W1), sd = power2(W2))
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
@@ -415,16 +414,16 @@ vecfun.reset()
 vecfun.print()
 
 ## ----message=FALSE----------------------------------------------------------------------
-vecfun.reset()  
+vecfun.reset()
 ifelse1 <- function(arg) {
   ifelse(arg[1], arg[2], arg[3])
 }
 
 D <- DAG.empty()
-D <- D + 
-  node("W1", distr = "rbern", 
+D <- D +
+  node("W1", distr = "rbern",
         prob = 0.05) +
-  node("W2", distr = "rbern", 
+  node("W2", distr = "rbern",
         prob = ifelse1(c(W1, 0.5, 0.1)))
 
 D2nonvec <- set.DAG(D)
@@ -437,17 +436,17 @@ ifelse2 <- function(arg, val1, val2) {
 vecfun.add(c("ifelse2"))
 
 D <- DAG.empty()
-D <- D + 
-  node("W1", distr = "rbern", 
+D <- D +
+  node("W1", distr = "rbern",
         prob = 0.05) +
-  node("W2", distr = "rbern", 
+  node("W2", distr = "rbern",
         prob = ifelse2(W1, 0.5, 0.1))
 D2vec <- set.DAG(D)
 
 ## ----message=FALSE----------------------------------------------------------------------
   (t2nonvec <- system.time(sim2nonvec <- simobs(D2nonvec, n = 100000, rndseed = 123)))
   (t2vec <- system.time(sim2vec <- simobs(D2vec, n = 100000, rndseed = 123)))
-  all(unlist(lapply(seq(ncol(sim2nonvec)), 
+  all(unlist(lapply(seq(ncol(sim2nonvec)),
               function(coli) all.equal(sim2nonvec[, coli], sim2vec[, coli]))))
 
 ## ----message=FALSE----------------------------------------------------------------------
@@ -455,35 +454,35 @@ library("simcausal")
 options(simcausal.verbose=FALSE)
 
 D <- DAG.empty()
-D <- D + 
-  node("L2", t = 0, distr = "rbern", 
+D <- D +
+  node("L2", t = 0, distr = "rbern",
       prob = 0.05) +
-  node("L1", t = 0, distr = "rbern", 
+  node("L1", t = 0, distr = "rbern",
       prob = ifelse(L2[0] == 1, 0.5, 0.1)) +
-  node("A1", t = 0, distr = "rbern", 
+  node("A1", t = 0, distr = "rbern",
       prob = ifelse(L1[0] == 1 & L2[0] == 0, 0.5,
                 ifelse(L1[0] == 0 & L2[0] == 0, 0.1,
                   ifelse(L1[0] == 1 & L2[0] == 1, 0.9, 0.5)))) +
-  node("A2", t = 0, distr = "rbern", 
+  node("A2", t = 0, distr = "rbern",
       prob = 0, EFU = TRUE)
 
 ## ----message=FALSE----------------------------------------------------------------------
 t.end <- 16
-D <- D + 
+D <- D +
   node("Y", t = 1:t.end, distr = "rbern",
-      prob = 
-        plogis(-6.5 + L1[0] + 4 * L2[t-1] + 0.05 * sum(I(L2[0:(t-1)] == rep(0, t)))), 
+      prob =
+        plogis(-6.5 + L1[0] + 4 * L2[t-1] + 0.05 * sum(I(L2[0:(t-1)] == rep(0, t)))),
       EFU = TRUE) +
   node("L2", t = 1:t.end, distr = "rbern",
-      prob = 
-        ifelse(A1[t-1] == 1, 0.1, 
+      prob =
+        ifelse(A1[t-1] == 1, 0.1,
           ifelse(L2[t-1] == 1, 0.9, min(1, 0.1 + t / 16)))) +
-  node("A1", t = 1:t.end, distr = "rbern", 
+  node("A1", t = 1:t.end, distr = "rbern",
       prob = ifelse(A1[t-1] == 1, 1,
                 ifelse(L1[0] == 1 & L2[t] == 0, 0.3,
                   ifelse(L1[0] == 0 & L2[t] == 0, 0.1,
                     ifelse(L1[0] == 1 & L2[t] == 1, 0.7, 0.5))))) +
-  node("A2", t = 1:t.end, distr = "rbern", 
+  node("A2", t = 1:t.end, distr = "rbern",
       prob = {if(t == 16) {1} else {0}},
       EFU = TRUE)
 lDAG <- set.DAG(D)
@@ -501,7 +500,7 @@ plotDAG(lDAG, xjitter = 0.3, yjitter = 0.01)
 
 ## ----DAGlongtmax3, echo=FALSE, message=FALSE, fig.pos='H', out.width='0.8\\linewidth', fig.cap='Graphical representation of a portion of the structural equation model using a DAG. Only the nodes indexed by time points lower than or equal to 3 are represented.', pdfcrop=TRUE----
 plotDAG(lDAG, tmax = 3, xjitter = 0.3, yjitter = 0.03,
-        edge_attrs = list(width = 0.5, arrow.width = 0.4, arrow.size = 0.8), 
+        edge_attrs = list(width = 0.5, arrow.width = 0.4, arrow.size = 0.8),
         vertex_attrs = list(size = 12, label.cex = 0.8))
 
 ## ----message=FALSE----------------------------------------------------------------------
@@ -511,9 +510,9 @@ Odat <- sim(DAG = lDAG, n = 100, rndseed = 123)
 Odat[1,1:10]
 
 ## ---------------------------------------------------------------------------------------
-act_theta <-c(node("A1", t = 0, distr = "rbern", 
+act_theta <-c(node("A1", t = 0, distr = "rbern",
                     prob = ifelse(L2[0] >= theta , 1, 0)),
-              node("A1", t = 1:(t.end), distr = "rbern", 
+              node("A1", t = 1:(t.end), distr = "rbern",
                     prob = ifelse(A1[t-1] == 1, 1, ifelse(L2[t] >= theta, 1, 0))))
 
 ## ----message=FALSE----------------------------------------------------------------------
@@ -537,20 +536,20 @@ plotDAG(A(Ddyn)[["A1_th0"]], tmax = 3, xjitter = 0.3, yjitter = 0.03,
 
 ## ----message=FALSE----------------------------------------------------------------------
 A(Ddyn)[["A1_th0"]]$A1_0
-Ddyntry <- Ddyn + 
+Ddyntry <- Ddyn +
   action("A1_th0", nodes = node("A1", t = 0, distr = "rbern", prob = 0))
 A(Ddyntry)[["A1_th0"]]$A1_0
 
 ## ----message=FALSE----------------------------------------------------------------------
 A(Ddyntry)[["A1_th0"]]
-Ddyntry <- Ddyntry + 
+Ddyntry <- Ddyntry +
   action("A1_th0", nodes = act_theta, theta = 1, newparam = 100)
 A(Ddyntry)[["A1_th0"]]
 
 ## ----message=FALSE, warning=FALSE-------------------------------------------------------
-act_theta_t <-c(node("A1",t = 0, distr = "rbern", 
+act_theta_t <-c(node("A1",t = 0, distr = "rbern",
                     prob = ifelse(L2[0] >=  theta[t], 1, 0)),
-                node("A1",t = 1:t.end, distr = "rbern", 
+                node("A1",t = 1:t.end, distr = "rbern",
                     prob = ifelse(A1[t-1]==1, 1, ifelse(L2[t] >= theta[t], 1, 0)))
                 )
 Ddyntry <- Ddyntry + action("A1_th0", nodes = act_theta_t, theta = rep(0,(t.end)+1))
@@ -559,7 +558,7 @@ A(Ddyntry)[["A1_th0"]]
 ## ----message=FALSE----------------------------------------------------------------------
 `%+%` <- function(a, b) paste0(a, b)
 Dstat <- lDAG
-act_A1_tswitch <- node("A1",t = 0:(t.end), distr = "rbern", 
+act_A1_tswitch <- node("A1",t = 0:(t.end), distr = "rbern",
                       prob = ifelse(t >= tswitch, 1, 0))
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
@@ -567,7 +566,7 @@ tswitch_vec <- (0:t.end)
 for (tswitch_i in tswitch_vec) {
   abar <- rep(0, length(tswitch_vec))
   abar[which(tswitch_vec >= tswitch_i)] <- 1
-  Dstat <- Dstat + action("A1_ts"%+%tswitch_i, 
+  Dstat <- Dstat + action("A1_ts"%+%tswitch_i,
                           nodes = act_A1_tswitch,
                           tswitch = tswitch_i,
                           abar = abar)
@@ -650,7 +649,7 @@ eval.target(Ddyn, data = Xdyn)$res
 
 ## ----message=FALSE----------------------------------------------------------------------
 msm.form <- "Y ~ theta + t + I(theta*t)"
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form,
                       family = "binomial", hazard = FALSE)
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
@@ -662,9 +661,9 @@ XdynLTCF <- lapply(Xdyn, doLTCF, LTCF = "Y")
 eval.target(Ddyn, data = XdynLTCF)$coef
 
 ## ----survfig2, fig.pos='htb!', fig.width=8,fig.height=7,out.width='.6\\linewidth', message=FALSE, fig.cap='Survival curve estimates evaluated based on working MSM 1'----
-surv_th0 <- 1 - predict(MSMres$m, newdata = data.frame(theta = rep(0, 16), t = 1:16), 
+surv_th0 <- 1 - predict(MSMres$m, newdata = data.frame(theta = rep(0, 16), t = 1:16),
                         type = "response")
-surv_th1 <- 1 - predict(MSMres$m, newdata = data.frame(theta = rep(1, 16), t = 1:16), 
+surv_th1 <- 1 - predict(MSMres$m, newdata = data.frame(theta = rep(1, 16), t = 1:16),
                         type = "response")
 plotSurvEst(surv = list(MSM_theta1 = surv_th1, MSM_theta0 = surv_th0),
             xindx = 1:16,
@@ -673,10 +672,10 @@ plotSurvEst(surv = list(MSM_theta1 = surv_th1, MSM_theta0 = surv_th0),
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
 
-msm.form <- "Y ~ theta + t + I(t^2) + I(t^3) + I(t^4) + I(t^5) + I(t*theta) + I(t^2*theta) + 
+msm.form <- "Y ~ theta + t + I(t^2) + I(t^3) + I(t^4) + I(t^5) + I(t*theta) + I(t^2*theta) +
               I(t^3*theta) + I(t^4*theta) + I(t^5*theta)"
 
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, formula = msm.form, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, formula = msm.form,
                       family = "binomial", hazard = FALSE)
 MSMres2 <- eval.target(Ddyn, n = 1000, rndseed = 123)
 MSMres2$coef
@@ -689,11 +688,11 @@ surv_th1 <- 1 - predict(MSMres2$m, newdata = data.frame(theta = rep(1, 16), t = 
 plotSurvEst(surv = list(MSM_theta1 = surv_th1, MSM_theta0 = surv_th0),
             xindx = 1:16,
             ylab = "MSM Survival, P(T>t)",
-            ylim = c(0.75, 1.0))  
+            ylim = c(0.75, 1.0))
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
 msm.form <- "Y ~ theta + as.factor(t) + as.factor(t):theta "
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, formula = msm.form, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, formula = msm.form,
                       family = "binomial", hazard = FALSE)
 MSMres3 <- eval.target(Ddyn, n = 1000, rndseed = 123)
 MSMres3$coef
@@ -710,7 +709,7 @@ plotSurvEst(surv = list(MSM_theta1 = surv_th1, MSM_theta0 = surv_th0),
 
 ## ---------------------------------------------------------------------------------------
 msm.form <- "Y ~ theta + t + I(theta*t)"
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form,
                       family = "binomial", hazard = TRUE)
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
@@ -718,9 +717,9 @@ MSMres <- eval.target(Ddyn, n = 1000, rndseed = 123)
 MSMres$coef
 
 ## ----survfig5, fig.pos='htb!', fig.width=8,fig.height=7,out.width='.6\\linewidth', message=FALSE, fig.cap='Hazard estimates evaluated based on working MSM 4'----
-h_th0 <- predict(MSMres$m, newdata = data.frame(theta = rep(0, 16), t = 1:16), 
+h_th0 <- predict(MSMres$m, newdata = data.frame(theta = rep(0, 16), t = 1:16),
                 type = "response")
-h_th1 <- predict(MSMres$m, newdata = data.frame(theta = rep(1, 16), t = 1:16), 
+h_th1 <- predict(MSMres$m, newdata = data.frame(theta = rep(1, 16), t = 1:16),
                 type = "response")
 plotSurvEst(surv = list(MSM_theta1 = h_th1, MSM_theta0 = h_th0),
             xindx = 1:16,
@@ -737,7 +736,7 @@ plotSurvEst(surv = list(MSM_theta1 = Surv_h_th1, MSM_theta0 = Surv_h_th0),
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
 msm.form_sum <- "Y ~ theta + t + I(theta*t) + I(theta*L1)"
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form_sum, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form_sum,
                       family = "binomial", hazard = TRUE)
 MSMres <- eval.target(Ddyn, n = 1000, rndseed = 123)
 MSMres$coef
@@ -765,7 +764,7 @@ plotSurvEst(surv = list(MSM_theta1 = Sth1L1_1, MSM_theta0 = Sth0L1_1),
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
 msm.form.correct <- "Y ~ theta + t + I(theta*t) + I(theta * S(L2[0]))"
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form.correct, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = 1:16, form = msm.form.correct,
                       family = "binomial", hazard = TRUE)
 MSMres.correct <- eval.target(Ddyn, n = 1000, rndseed = 123)
 MSMres.correct$coef
@@ -775,7 +774,7 @@ Xts <- sim(Dstat, actions = names(A(Dstat)), n = 1000, rndseed = 123)
 
 ## ----message=FALSE, cache=cache_opt-----------------------------------------------------
 msm.form_1 <- "Y ~  t + S(mean(abar[0:(t-1)])) + I(t*S(mean(abar[0:(t-1)])))"
-Dstat <- set.targetMSM(Dstat, outcome = "Y", t = 1:16, form = msm.form_1, 
+Dstat <- set.targetMSM(Dstat, outcome = "Y", t = 1:16, form = msm.form_1,
                         family = "binomial", hazard = TRUE)
 MSMres <- eval.target(Dstat, data = Xts)
 MSMres$coef
@@ -787,19 +786,19 @@ names(MSMres$df_long)
 MSMres$df_long[["A1_ts2"]]
 
 ## ----survfig8, fig.pos='htb!', fig.width=10, fig.height=5, message=FALSE, fig.cap='Survival curve estimates evaluated based on working MSM 7'----
-survMSMh_wS <- survbyMSMterm(MSMres = MSMres, t_vec = 1:16, 
+survMSMh_wS <- survbyMSMterm(MSMres = MSMres, t_vec = 1:16,
                               MSMtermName = "mean(abar[0:(t - 1)])")
 print(plotsurvbyMSMterm(survMSMh_wS))
 
 ## ----message=FALSE----------------------------------------------------------------------
 t.end <- 12
 D <- DAG.empty()
-D <- D + 
-        node("L2", t = 0, distr = "rbern", 
+D <- D +
+        node("L2", t = 0, distr = "rbern",
               prob = 0.05) +
-        node("m1L2", t = 0, distr = "rconst", 
+        node("m1L2", t = 0, distr = "rconst",
               const = 1 - L2[0]) +
-        node("L1", t = 0, distr = "rbern", 
+        node("L1", t = 0, distr = "rbern",
               prob = ifelse(L2[0] == 1, 0.8, 0.3)) +
         node("A1", t = 0, distr = "rbern",
               prob = ifelse(L1[0] == 1 & L2[0] == 0, 0.5,
@@ -807,9 +806,9 @@ D <- D +
                         ifelse(L1[0] == 1 & L2[0] == 1, 0.8, 0.5)))) +
         node("A2", t = 0, distr = "rbern", prob = 0, EFU = TRUE)
 
-D <- D + 
+D <- D +
         node("Y", t = 1:t.end, distr = "rbern",
-              prob = plogis(-7 + 3 * L1[0] + 5 * L2[t-1] + 
+              prob = plogis(-7 + 3 * L1[0] + 5 * L2[t-1] +
                             0.1 * sum(I(L2[0:(t-1)] == rep(0, t)))),
               EFU = TRUE) +
         node("L2", t = 1:t.end, distr = "rbern",
@@ -822,18 +821,18 @@ D <- D +
                         ifelse(L1[0] == 0 & L2[t] == 0, 0.2,
                           ifelse(L1[0] == 1 & L2[t] == 1, 0.8, 0.6))))) +
         node("A2", t = 1:t.end, distr = "rbern",
-              prob = {if(t == .(t.end)) {1} else {0}},
+              prob = {if(t == t.end) {1} else {0}},
               EFU = TRUE)
 
 lDAG <- set.DAG(D)
 Ddyn <- lDAG
 
 ## ----message=FALSE, echo=FALSE----------------------------------------------------------
-anodes <- node("A1", t = (0:t.end), distr = "rbern", 
+anodes <- node("A1", t = (0:t.end), distr = "rbern",
                 prob = {if (t == 0) {ifelse(L2[0] >= theta, 1, 0)} else
                         {ifelse(A1[t-1] == 1, 1, ifelse(L2[t] >= theta, 1, 0))}})
-Ddyn <- Ddyn + 
-              action("A1_th0", nodes = anodes, theta = 0) + 
+Ddyn <- Ddyn +
+              action("A1_th0", nodes = anodes, theta = 0) +
               action("A1_th1", nodes = anodes, theta = 1)
 
 ## ----message=FALSE, eval=TRUE-----------------------------------------------------------
@@ -864,7 +863,7 @@ MSM_RD_t <- function(resMSM, t) {
 }
 
 msm.form <- "Y ~ theta + as.factor(t) + as.factor(t):theta "
-Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = (1:t0), formula = msm.form, 
+Ddyn <- set.targetMSM(Ddyn, outcome = "Y", t = (1:t0), formula = msm.form,
                       family = "binomial", hazard = FALSE)
 
 getMSM.truetarget <- function() {
@@ -889,13 +888,13 @@ gforms <- c("A1_0 ~ L1_0 + L2_0","A2_0 ~ L1_0")
 timesm0 <- times[which(times > 0)]
 # correctly specified g:
 gforms <- c("A1_0 ~ L1_0 + L2_0","A2_0 ~ L1_0")
-gformm0 <- as.vector(sapply(timesm0, function(t) 
+gformm0 <- as.vector(sapply(timesm0, function(t)
               c("A1_"%+%t%+%" ~ A1_"%+%(t-1)%+%" + L1_0"%+%" + L2_"%+%t%+%" + I(L2_"%+%t%+%"*A1_"%+%(t-1)%+%")+ I(L1_0*A1_"%+%(t-1)%+%")",
                 "A2_"%+%t%+%" ~ L1_0")))
 gforms <- c(gforms, gformm0)
 # mis-specified g (no TV covar L2):
 gforms_miss <- c("A1_0 ~ L1_0","A2_0 ~ L1_0")
-gformm0_miss <- as.vector(sapply(timesm0, function(t) 
+gformm0_miss <- as.vector(sapply(timesm0, function(t)
                               c("A1_"%+%t%+%" ~ L1_0*A1_"%+%(t-1),
                                 "A2_"%+%t%+%" ~ L1_0")))
 gforms_miss <- c(gforms_miss, gformm0_miss)
@@ -930,21 +929,21 @@ weight.msm <- FALSE
 simrun_ltmleMSM <- function(sim, DAG, N, t0,gbounds, gforms) {
   library("ltmle")
   O_datnew <- sim(DAG = DAG, n = N)
-  ltmleMSMparams <- est.targetMSM(DAG, O_datnew, Aname = "A1", Cname = "A2", Lnames = "L2", 
+  ltmleMSMparams <- est.targetMSM(DAG, O_datnew, Aname = "A1", Cname = "A2", Lnames = "L2",
                                   Ytvec = (1:t.end), ACLtvec = (0:t.end), package = "ltmle")
   summeas_arr <- ltmleMSMparams$summeas_arr
   regimens_arr <- ltmleMSMparams$regimens_arr[,c(1:t.end),]
   O_datnewLTCF <- doLTCF(data = O_datnew, LTCF = "Y")
   O_dat_selCnew <- O_datnewLTCF[,-which(names(O_datnewLTCF)%in%dropnms)]
   O_dat_selCnew[,Cnodesnew] <- 1-O_dat_selCnew[,Cnodesnew]
-  reslTMLE.MSM <- ltmleMSM(data = O_dat_selCnew, Anodes = Anodesnew, Cnodes = Cnodesnew, 
-                              Lnodes = Lnodesnew, Ynodes = Ynodesnew, 
+  reslTMLE.MSM <- ltmleMSM(data = O_dat_selCnew, Anodes = Anodesnew, Cnodes = Cnodesnew,
+                              Lnodes = Lnodesnew, Ynodes = Ynodesnew,
                               survivalOutcome = survivalOutcome,
                               gform = gforms, Qform = Qforms,
-                              stratify = stratify_Qg, mhte.iptw = mhte.iptw, 
-                              iptw.only = FALSE, 
-                              working.msm = msm.form, pooledMSM = pooledMSM, 
-                              final.Ynodes = finYnodesnew, regimes = regimens_arr, 
+                              stratify = stratify_Qg, mhte.iptw = mhte.iptw,
+                              iptw.only = FALSE,
+                              working.msm = msm.form, pooledMSM = pooledMSM,
+                              final.Ynodes = finYnodesnew, regimes = regimens_arr,
                               summary.measures = summeas_arr, weight.msm=weight.msm,
                               estimate.time = FALSE, gbounds = gbounds)
   iptwMSMcoef <- summary(reslTMLE.MSM, estimator = "iptw")$cmat[,1]
@@ -978,14 +977,14 @@ iptw_sims <- sim50K.stratQg.notrunc.g[,"iptwRD"]
 tmle_sims <- sim50K.stratQg.notrunc.g[,"tmleRD"]
 getrestab <- function(iptw_sims, tmle_sims, origres, modelnm) {
   resrow <- function(sims, estname) {
-    data.frame(estname, 
+    data.frame(estname,
                 sprintf("%.3f",mean(sims)), # round(mean(sims),3),
                 sprintf("%.4f",mean(sims)-psi0.t0.MSM), # round(((mean(sims)-psi0.t0.MSM)/psi0.t0.MSM)*100,3),
                 sprintf("%.4f",sd(sims)), # round(sd(sims),4)
                 stringsAsFactors=FALSE
                 )
   }
-  tabcolnames <- c("Estimator", "$\\psi_{n}$", "Bias", "$\\sigma_{emp}$", "$\\sigma_{emp}^{IPTW}/\\sigma_{emp}^{TMLE}$")    
+  tabcolnames <- c("Estimator", "$\\psi_{n}$", "Bias", "$\\sigma_{emp}$", "$\\sigma_{emp}^{IPTW}/\\sigma_{emp}^{TMLE}$")
   restab <- rbind(resrow(tmle_sims, "TMLE "%+%modelnm), resrow(iptw_sims, "IPTW "%+%modelnm))
   restab <- cbind(restab, c(round(sd(iptw_sims)/sd(tmle_sims),2), ""))
   restab <- rbind(c("\\emph{Results from this replication study}", "", "", "", ""), restab)
@@ -1034,31 +1033,31 @@ Lnames <- c("LO1", "LO2", "LO3", "LC1")
 D <- DAG.empty()
 
 for (Lname in Lnames) {
-  D <- D + 
-    node(Lname%+%".norm1", distr = "rnorm", mean = 0, sd = 1) + 
+  D <- D +
+    node(Lname%+%".norm1", distr = "rnorm", mean = 0, sd = 1) +
     node(Lname%+%".norm2", distr = "rnorm", mean = 0, sd = 1)
 }
 
 D <- D +
-  node("LO1", t = 0:1, distr = "rbivNorm", whichbiv = t + 1, 
-        norms = c(LO1.norm1, LO1.norm2), 
-        mu = 0) + 
+  node("LO1", t = 0:1, distr = "rbivNorm", whichbiv = t + 1,
+        norms = c(LO1.norm1, LO1.norm2),
+        mu = 0) +
   node("LO2", t = 0:1, distr = "rbivNorm", whichbiv = t + 1,
-        norms = c(LO2.norm1, LO2.norm2), 
-        mu = 0) + 
-  node("LO3", t = 0:1, distr = "rbivNorm", whichbiv = t + 1, 
-        norms = c(LO3.norm1, LO3.norm2), 
-        mu = 0) + 
-  node("LC1", t = 0:1, distr = "rbivNorm", whichbiv = t + 1, 
-        norms = c(LC1.norm1, LC1.norm2), 
-        mu = {if (t == 0) {0} else {-0.30 * A[t-1]}}) + 
-  node("alpha", t = 0:1, distr = "rconst", 
-        const = {if(t == 0) {log(0.6)} else {log(1.0)}}) + 
-  node("A", t = 0:1, distr = "rbern", 
-        prob = plogis(alpha[t] + 
-                      log(5)*LC1[t] + {if(t == 0) {0} else {log(5)*A[t-1]}})) + 
-  node("Y", t = 1, distr = "rnorm", 
-        mean = (0.98 * LO1[t] + 0.58 * LO2[t] + 0.33 * LO3[t] + 
+        norms = c(LO2.norm1, LO2.norm2),
+        mu = 0) +
+  node("LO3", t = 0:1, distr = "rbivNorm", whichbiv = t + 1,
+        norms = c(LO3.norm1, LO3.norm2),
+        mu = 0) +
+  node("LC1", t = 0:1, distr = "rbivNorm", whichbiv = t + 1,
+        norms = c(LC1.norm1, LC1.norm2),
+        mu = {if (t == 0) {0} else {-0.30 * A[t-1]}}) +
+  node("alpha", t = 0:1, distr = "rconst",
+        const = {if(t == 0) {log(0.6)} else {log(1.0)}}) +
+  node("A", t = 0:1, distr = "rbern",
+        prob = plogis(alpha[t] +
+                      log(5)*LC1[t] + {if(t == 0) {0} else {log(5)*A[t-1]}})) +
+  node("Y", t = 1, distr = "rnorm",
+        mean = (0.98 * LO1[t] + 0.58 * LO2[t] + 0.33 * LO3[t] +
                 0.98 * LC1[t] - 0.37 * A[t]),
         sd = 1)
 
@@ -1067,17 +1066,17 @@ DAGO.sc1 <- set.DAG(D)
 ## ----message=FALSE, results='hide'------------------------------------------------------
 defAct <- function (Dact) {
   act.At <- node("A", t = 0:1, distr = "rbern", prob = abar[t])
-  Dact <- Dact + 
-    action("A00", nodes = act.At, abar = c(0, 0)) + 
-    action("A10", nodes = act.At, abar = c(1, 0)) + 
-    action("A01", nodes = act.At, abar = c(0, 1)) + 
+  Dact <- Dact +
+    action("A00", nodes = act.At, abar = c(0, 0)) +
+    action("A10", nodes = act.At, abar = c(1, 0)) +
+    action("A01", nodes = act.At, abar = c(0, 1)) +
     action("A11", nodes = act.At, abar = c(1, 1))
   return(Dact)
 }
 
 Dact.sc1 <- defAct(DAGO.sc1)
 msm.form <- "Y ~ S(abar[0]) + S(abar[1])"
-Dact.sc1 <- set.targetMSM(Dact.sc1, outcome = "Y", t = 1, 
+Dact.sc1 <- set.targetMSM(Dact.sc1, outcome = "Y", t = 1,
                           form = msm.form, family = "gaussian")
 
 ## ----message=FALSE, eval=TRUE-----------------------------------------------------------
@@ -1132,8 +1131,8 @@ runMSMsw <- function(DAGO, Lnames, trueA, nsamp, nsims) {
   bias10 <- sprintf("%.3f",bias*10)
   MSE10 <- sprintf("%.3f",MSE*10)
   resrow <- c(bias10[1], MSE10[1], bias10[2], MSE10[2])
-  col36names <- c("\\specialcell[t]{A(0)\\\\ Bias*10}", 
-                  "\\specialcell[t]{A(0)\\\\ MSE*10}", 
+  col36names <- c("\\specialcell[t]{A(0)\\\\ Bias*10}",
+                  "\\specialcell[t]{A(0)\\\\ MSE*10}",
                   "\\specialcell[t]{A(1)\\\\ Bias*10}",
                   "\\specialcell[t]{A(1)\\\\ MSE*10}")
   names(resrow) <- col36names
@@ -1144,7 +1143,7 @@ runMSMsw <- function(DAGO, Lnames, trueA, nsamp, nsims) {
 # recreating Tables 2 & 4 reported in Lefebvre et al.
 nsamp <- c(300,1000,10000)
 # Lefebvre et al. Tab 2:
-covnmT2 <- c(c("\\emph{Lefebvre et al.}: Confounder(s) only", rep("",2)), 
+covnmT2 <- c(c("\\emph{Lefebvre et al.}: Confounder(s) only", rep("",2)),
             c("\\emph{Lefebvre et al.}: Confounder(s) &", "risk factors", rep("",1)))
 lefebvreT2 <- data.frame(
   covnm = covnmT2,
@@ -1163,22 +1162,22 @@ covnmT4 <- c(c("\\emph{Lefebvre et al.}: Confounder(s) only", rep("",2)),
 lefebvreT4 <- data.frame(
   covnm = covnmT4,
   N = rep(nsamp,6),
-  A0Bias10 = sprintf("%.3f",c(-0.080, -0.371, -0.368, -0.110, -0.330, -0.378, 1.611, 
-                              0.824, 0.241, 1.600, 0.867, 0.235, 3.146, 2.460, 2.364, 
+  A0Bias10 = sprintf("%.3f",c(-0.080, -0.371, -0.368, -0.110, -0.330, -0.378, 1.611,
+                              0.824, 0.241, 1.600, 0.867, 0.235, 3.146, 2.460, 2.364,
                               1.524, 0.878, 0.240)),
-  A0MSE10 = sprintf("%.3f",c(1.170, 0.385, 0.056, 1.092, 0.340, 0.051, 3.538, 2.063, 
-                              0.684, 3.477, 2.053, 0.676, 3.326, 1.700, 0.832, 3.648, 
+  A0MSE10 = sprintf("%.3f",c(1.170, 0.385, 0.056, 1.092, 0.340, 0.051, 3.538, 2.063,
+                              0.684, 3.477, 2.053, 0.676, 3.326, 1.700, 0.832, 3.648,
                               2.099, 0.679)),
-  A1Bias10 = sprintf("%.3f",c(0.099, -0.035, -0.203, 0.112, -0.108, -0.207, 2.069, 1.245, 
+  A1Bias10 = sprintf("%.3f",c(0.099, -0.035, -0.203, 0.112, -0.108, -0.207, 2.069, 1.245,
                               0.379, 2.143, 1.170, 0.372, 5.591, 5.258, 4.943, 2.221, 1.185,
                               0.377)),
-  A1MSE10 = sprintf("%.3f",c(1.155, 0.331, 0.043, 0.865, 0.245, 0.037, 3.841, 2.188, 0.622, 
+  A1MSE10 = sprintf("%.3f",c(1.155, 0.331, 0.043, 0.865, 0.245, 0.037, 3.841, 2.188, 0.622,
                               3.598, 2.043, 0.625, 5.494, 3.851, 2.705, 3.907, 2.099, 0.630)),
                   stringsAsFactors = FALSE)
 col1name <- "Covariates in $P(A|L)$"
 colnames(lefebvreT2)[1] <- colnames(lefebvreT4)[1] <- col1name
-col36names <- c("\\specialcell[t]{A(0)\\\\ Bias*10}", 
-                "\\specialcell[t]{A(0)\\\\ MSE*10}", 
+col36names <- c("\\specialcell[t]{A(0)\\\\ Bias*10}",
+                "\\specialcell[t]{A(0)\\\\ MSE*10}",
                 "\\specialcell[t]{A(1)\\\\ Bias*10}",
                 "\\specialcell[t]{A(1)\\\\ MSE*10}")
 colnames(lefebvreT2)[3:6] <- colnames(lefebvreT4)[3:6] <- col36names
@@ -1213,16 +1212,16 @@ colnames(lefebvreT2)[3:6] <- colnames(lefebvreT4)[3:6] <- col36names
 library("Hmisc")
 load(file = "vignette_dat/restabSc1_all_1Ksims.Rdata");
 cat("\n")
-latex(restab, file = "", where = "!htpb", caption.loc = 'bottom', 
-    caption = "Replication of the simulation results from \\citet{lefebvre2008} for Scenario 1.", 
-    label = 'tab2Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE, 
+latex(restab, file = "", where = "!htpb", caption.loc = 'bottom',
+    caption = "Replication of the simulation results from \\citet{lefebvre2008} for Scenario 1.",
+    label = 'tab2Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE,
     col.just = c("l", rep("r", 5)), size = "small")
 
 ## ----chunk.lefebSc1c, message=FALSE, echo=FALSE, results="asis"-------------------------
 cat("\n")
-latex(lefebvreT2, file = "", where = "!htpb", caption.loc = 'bottom', 
-    caption = "Simulation results for Scenario 1 as reported in Table II of \\citet{lefebvre2008}.", 
-    label = 'origtab2Lefebvre', booktabs = TRUE, rowname = NULL, landscape = FALSE, 
+latex(lefebvreT2, file = "", where = "!htpb", caption.loc = 'bottom',
+    caption = "Simulation results for Scenario 1 as reported in Table II of \\citet{lefebvre2008}.",
+    label = 'origtab2Lefebvre', booktabs = TRUE, rowname = NULL, landscape = FALSE,
     col.just = c("l", rep("r", 5)), size = "small")
 
 ## ----message=FALSE, warning=FALSE, results='hide'---------------------------------------
@@ -1255,11 +1254,11 @@ for (i in (1:3)) {
           mean = 0, sd = .(sdLNi[i]))
 }
 
-D <- D + 
+D <- D +
   node("alpha", t = 0:1, distr = "rconst",
         const = {if(t == 0) {log(0.6)} else {log(1.0)}}) +
-  node("A", t = 0:1, distr = "rbern", 
-        prob = plogis(alpha[t] + 
+  node("A", t = 0:1, distr = "rbern",
+        prob = plogis(alpha[t] +
                       log(5) * LC1[t] + log(2) * LC2[t] + log(1.5) * LC3[t] +
                       log(5) * LE1[t] + log(2) * LE2[t] + log(1.5) * LE3[t] +
                       {if (t == 0) {0} else {log(5) * A[t-1]}})) +
@@ -1273,7 +1272,7 @@ DAGO.sc3 <- set.DAG(D)
 ## ----message=FALSE, eval=TRUE-----------------------------------------------------------
 Dact.sc3 <- defAct(DAGO.sc3)
 msm.form <- "Y ~ S(abar[0]) + S(abar[1])"
-Dact.sc3 <- set.targetMSM(Dact.sc3, outcome = "Y", t = 1, 
+Dact.sc3 <- set.targetMSM(Dact.sc3, outcome = "Y", t = 1,
                           form = msm.form, family = "gaussian")
 
 repstudy2.sc3.truetarget <- function() {
@@ -1341,16 +1340,16 @@ if (file.exists(f2name)) {
 library("Hmisc")
 load(file = "vignette_dat/restabSc3_all_1Ksims.Rdata");
 cat("\n")
-latex(restab,file = "",where = "!htpb", caption.loc = 'bottom', 
-    caption = "Replication of the simulation results from \\citet{lefebvre2008} for Scenario 3.", 
-    label = 'tab4Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE, 
+latex(restab,file = "",where = "!htpb", caption.loc = 'bottom',
+    caption = "Replication of the simulation results from \\citet{lefebvre2008} for Scenario 3.",
+    label = 'tab4Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE,
     col.just = c("l", rep("r", 5)), size = "small")
 
 ## ----chunk.lefebSc3c, message=FALSE, echo=FALSE, results="asis"-------------------------
 cat("\n")
-latex(lefebvreT4,file = "",where = "!htpb", caption.loc = 'bottom', 
-    caption = "Simulation results for Scenario 3 as reported in Table IV of \\citet{lefebvre2008}.", 
-    label = 'origtab4Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE, 
+latex(lefebvreT4,file = "",where = "!htpb", caption.loc = 'bottom',
+    caption = "Simulation results for Scenario 3 as reported in Table IV of \\citet{lefebvre2008}.",
+    label = 'origtab4Lefebvre',booktabs = TRUE,rowname = NULL,landscape = FALSE,
     col.just = c("l", rep("r", 5)), size = "small")
 
 ## ----appendixcode1, ref.label = 'chunkMSMsurvplot', eval=FALSE, echo=TRUE, size='tiny'----
