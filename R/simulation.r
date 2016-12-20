@@ -188,7 +188,12 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, rnd
   obs.df <- data.frame(ID = seq(vector(length = Nsamp))) # obs.df <- data.frame(ID = seq(1:Nsamp))
   obs.dt <- data.table(obs.df)
 
-  alloc.col(obs.dt, max(min(length(DAG)+1, 1000), 200)) # need to allocate columns in DT to maximum number of variables
+  # for efficiency, allocate columns in DT to maximum number of variables, if it exceeds 1025 (default)
+  DT.cols <- (length(DAG)+1)
+  if (DT.cols > 1025) {
+    alloc.col(obs.dt, DT.cols)
+  }
+  # alloc.col(obs.dt, max(min(length(DAG)+1, 1000), 200))
 
   #---------------------------------------------------------------------------------
   # CHECKS PERFORMED DURING EVALUTION:
@@ -394,7 +399,7 @@ simFromDAG <- function(DAG, Nsamp, wide = TRUE, LTCF = NULL, rndseed = NULL, rnd
     excl.cols <- colnames(obs.dt)%in%latent.v
     if (sum(excl.cols) > 0) {
       # obs.df <- obs.df[,!excl.cols]
-      obs.dt[,(colnames(obs.dt)[excl.cols]):=NULL]
+      obs.dt[,(colnames(obs.dt)[excl.cols]) := NULL]
     }
   }
 
@@ -524,6 +529,9 @@ simfull <- function(actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, rndsee
 sim <- function(DAG, actions, n, wide = TRUE, LTCF = NULL, rndseed = NULL, rndseed.reset.node = NULL, verbose = getOption("simcausal.verbose")) {
   # *) check if actions argument is missing -> simulate observed data from the DAG
   # *) if actions consist of characters, try to extract those actions from the DAG and simulate full data
+  if (!is.integerish(n)) stop("n must be an integer")
+  # if (!(n >= 1)) stop("n must be a positive integer")
+
   # SIMULATE OBSERVED DATA FROM DAG (if no actions)
   if (missing(actions)) {
     if (!is.DAG(DAG)) stop("DAG argument must be an object of class DAG")
@@ -735,6 +743,8 @@ DF.to.longDT <- function(df_wide, return_DF = TRUE) {
   dprint("all_ts"); dprint(all_ts)
   dprint("node_nms"); dprint(node_nms)
 
+  if (exists("setDTthreads")) setDTthreads(1)
+
   # if there are no time-points (t) attributes, then the long vs. wide format is undefined.
   if (length(all_ts)==0) return(df_wide)
   #******************************************************************************************************
@@ -755,14 +765,14 @@ DF.to.longDT <- function(df_wide, return_DF = TRUE) {
       # DT_melt <- data.table::melt(dat_df, id.vars="ID", measure.vars=value_vars, variable.factor=TRUE, na.rm=FALSE)
       var_nm_rep <- rep.int(var_nm, nrow(DT_melt))
       t_rep <- rep(t_pts, each=nrow(dat_df))
-      DT_melt[, c("LVname","t"):= list(var_nm_rep,t_rep)]
+      DT_melt[, c("LVname","t") := list(var_nm_rep,t_rep)]
       DT_l <- data.table::dcast.data.table(DT_melt, t + ID ~ LVname)
       data.table::setkeyv(DT_l, c("ID", "t"))
       # data.table::setkey(DT_l, ID, t)
       if (which(lvars%in%var_nm)==1) {
         DT_l_fin <- DT_l
       } else {
-        DT_l_fin[,var_nm:=DT_l[[var_nm]], with=FALSE]
+        DT_l_fin[, (var_nm) := DT_l[[var_nm]]]
       }
     }
     if (!is.null(bslvars)) {
@@ -801,7 +811,7 @@ DF.to.longDT <- function(df_wide, return_DF = TRUE) {
       ts_to_NAs <- all_ts[!all_ts%in%node_t_vals]
       ts_not_NAs <- all_ts[all_ts%in%node_t_vals]
       NA_nodenames <- cur_node_name%+%"_"%+%ts_to_NAs # define these node names as missing and add them to df
-      df_wide[, NA_nodenames:=NA, with=FALSE]
+      df_wide[, (NA_nodenames) := NA]
       all_vnames <- cur_node_name%+%"_"%+%all_ts
       varying <- c(varying, list(all_vnames))
       v.names <- c(v.names, cur_node_name)

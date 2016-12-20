@@ -1,6 +1,6 @@
 Package: simcausal
 Type: Package
-Version: 0.5.1
+Version: 0.5.3
 Title: Simulating Longitudinal Data with Causal Inference Applications
 Authors@R: c(
     person("Oleg", "Sofrygin", role=c("aut", "cre"), email="oleg.sofrygin@gmail.com"),
@@ -25,10 +25,10 @@ VignetteBuilder: knitr
 License: GPL-2
 RoxygenNote: 5.0.1
 NeedsCompilation: no
-Packaged: 2016-05-25 03:03:49 UTC; olegsofrygin
+Packaged: 2016-12-19 18:36:06 UTC; olegsofrygin
 Author: Oleg Sofrygin [aut, cre],
   Mark J. van der Laan [aut],
   Romain Neugebauer [aut]
 Maintainer: Oleg Sofrygin <oleg.sofrygin@gmail.com>
 Repository: CRAN
-Date/Publication: 2016-05-25 06:29:32
+Date/Publication: 2016-12-20 02:08:32
