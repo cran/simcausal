@@ -10,7 +10,7 @@ if(FALSE) {
   # simcausal:::debug_set() # SET TO DEBUG MODE
 
   setwd("..");
-  install("simcausal", build_vignettes = FALSE) # INSTALL W/ devtools:
+  install("simcausal", build_vignettes = FALSE, dependencies = FALSE) # INSTALL W/ devtools:
 
   # system("echo $PATH") # see the current path env var
   # system("R CMD Rd2pdf simcausal")  # just create the pdf manual from help files
@@ -18,10 +18,12 @@ if(FALSE) {
   # CHECK AND BUILD PACKAGE:
   getwd()
   # setwd("./simcausal"); setwd(".."); getwd()
-  devtools::check() # runs full check
+  devtools::check(cran = TRUE) # runs full check
+  devtools::check(cran = TRUE, args = c("--no-vignettes")) # runs full check
   devtools::check(args = c("--no-vignettes"), build_args = c("--no-build-vignettes")) # runs faster
   devtools::build_win(args = "--compact-vignettes") # build package on CRAN servers (windows os?)
   devtools::build(args = "--compact-vignettes") # build package tarball compacting vignettes
+  devtools::check_built(cran = TRUE)
   # devtools::build(args = "--no-build-vignettes") # build package tarball compacting vignettes
   # devtools::build() # build package tarball
 
@@ -264,23 +266,6 @@ test.EFUeval <- function(){
   Odatsim.1obs <- sim(D, n = 1, rndseed = 1)
   checkEquals(nrow(Odatsim.1obs),1)
 }
-
-test.long.wide.simobs <- function() {
-    library("simcausal"); options(simcausal.verbose=FALSE)
-    t_end <- 5
-    D <- DAG.empty() +
-      node("W", distr="rbern", prob=0.05) +
-      node("L1", t=0:t_end, distr="rbern", prob=0.25) +
-      node("L2", t=0:t_end, distr="rconst", const=L1[t] + W) +
-      node("Y",  t=0:t_end,  distr="rbern", prob=plogis(-6.5 + L1[t] + 2*L2[t] + 0.05*sum(I(L2[0:t]==rep(0,(t+1))))), EFU=TRUE)
-    Dset <- set.DAG(D)
-    Odat1 <- sim(Dset, n=500, wide = TRUE, rndseed = 123)
-    Odat1 <- simobs(Dset, n=500, wide = TRUE, rndseed = 123)
-    Odat1 <- sim(Dset, n=500, wide = FALSE, rndseed = 123)
-    Odat1 <- simobs(Dset, n=500, wide = FALSE, rndseed = 123)
-}
-
-
 
 # DAG2 (from tech specs): defining actions with a new constructor and passing attributes
 test.set.DAG_DAG2b_newactions <- function() {
