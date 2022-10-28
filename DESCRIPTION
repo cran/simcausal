@@ -1,11 +1,12 @@
 Package: simcausal
 Type: Package
-Version: 0.5.5
+Version: 0.5.6
 Title: Simulating Longitudinal Data with Causal Inference Applications
 Authors@R: c(
-    person("Oleg", "Sofrygin", role=c("aut", "cre"), email="oleg.sofrygin@gmail.com"),
+    person("Oleg", "Sofrygin", role=c("aut"), email="oleg.sofrygin@gmail.com"),
     person(c("Mark", "J."), "van der Laan", role="aut", email="laan@berkeley.edu"),
-    person("Romain", "Neugebauer", role="aut", email="Romain.S.Neugebauer@kp.org"))
+    person("Romain", "Neugebauer", role="aut", email="Romain.S.Neugebauer@kp.org"),
+    person("Fred", "Gruber", role=c("ctb","cre"), email="fgruber@gmail.com"))
 Description: A flexible tool for simulating complex longitudinal data using
     structural equations, with emphasis on problems in causal inference.
     Specify interventions and simulate from intervened data generating
@@ -22,12 +23,14 @@ Imports: data.table, igraph, stringr, R6, assertthat, Matrix, methods
 Suggests: copula, RUnit, ltmle, knitr, ggplot2, Hmisc, mvtnorm, bindata
 VignetteBuilder: knitr
 License: GPL-2
-RoxygenNote: 6.1.1
+RoxygenNote: 7.2.0
+Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2019-01-04 22:56:32 UTC; olegsofrygin
-Author: Oleg Sofrygin [aut, cre],
+Packaged: 2022-10-28 01:11:08 UTC; fred
+Author: Oleg Sofrygin [aut],
   Mark J. van der Laan [aut],
-  Romain Neugebauer [aut]
-Maintainer: Oleg Sofrygin <oleg.sofrygin@gmail.com>
+  Romain Neugebauer [aut],
+  Fred Gruber [ctb, cre]
+Maintainer: Fred Gruber <fgruber@gmail.com>
 Repository: CRAN
-Date/Publication: 2019-01-07 23:40:03 UTC
+Date/Publication: 2022-10-28 11:52:27 UTC
