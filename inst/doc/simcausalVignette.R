@@ -4,7 +4,7 @@
   require(knitr)
   require(simcausal)
   cache_opt <- TRUE
-  opts_chunk$set(fig.path='figure/beamer-',fig.align='center',fig.show='hold',size='footnotesize')
+  opts_chunk$set(fig.path='figure/beamer-',fig.align='center',fig.show='hold',size='footnotesize',escape=TRUE)
   # to crop white space in output figures:
   knit_hooks$set(pdfcrop = hook_pdfcrop)
   # To disable syntax color highlighing of R code in the entire document

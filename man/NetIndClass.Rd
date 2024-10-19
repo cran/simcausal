@@ -5,7 +5,7 @@
 \alias{NetIndClass}
 \title{R6 class for creating and storing a friend matrix (network IDs) for network data}
 \format{
-An \code{\link{R6Class}} generator object
+An \code{\link[R6]{R6Class}} generator object
 }
 \description{
 This R6 class defines fields and methods for creating and storing \code{NetInd_k},

@@ -66,7 +66,7 @@ Odat.wideLTCF2[c(21,47), 1:18]
 \code{\link{sim}}, \code{\link{simobs}} and \code{\link{simfull}} for simulating data with and without carry forward imputation.
 
 Other data manipulation functions: 
-\code{\link{DF.to.longDT}()},
-\code{\link{DF.to.long}()}
+\code{\link{DF.to.long}()},
+\code{\link{DF.to.longDT}()}
 }
 \concept{data manipulation functions}
